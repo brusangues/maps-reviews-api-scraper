@@ -1,0 +1,11 @@
+matplotlib 
+pandas 
+jupyter 
+scikit-learn 
+nltk 
+tqdm
+pyLDAvis
+gensim
+pyarrow
+selenium
+requests
