@@ -1,84 +1,53 @@
-# https://stackoverflow.com/questions/53749984/selenium-python-unable-to-scroll-down-while-fetching-google-reviews
-# https://hackernoon.com/scraping-google-maps-reviews
-# https://gist.github.com/gruentee/203e4ba3791581070df9a4b1e6c55549
-# https://beautiful-soup-4.readthedocs.io/en/latest/index.html?highlight=find#attrs
-# https://github.com/emerson-matos/googlemaps-scraper/blob/main/monitor.py
-# https://gist.github.com/IanHopkinson/ad45831a2fb73f537a79
-
-import requests
 from lxml import etree, html
 from bs4 import BeautifulSoup
-import regex as re
-from src.scrapper import get_text, cut_text, get_node_xpath, node_to_xpath
+from datetime import datetime
+from pathlib import Path
+from src.scraper import GoogleMapsAPIScraper
+from src.config import review_default_result
+import csv
+import pandas as pd
+import typer
 
+app = typer.Typer()
+
+hl = "pt-br"
+n_reviews = 40
+sort_by = "newest"
 feature_id = "0x94ce03043613e3d9:0x72a1063f1eb9c819"
+url = "https://www.google.com/maps/place/Atl%C3%A2ntico+Inn+Apart+Hotel/@-23.9689068,-46.3317906,17z/data=!4m22!1m11!3m10!1s0x94ce03046d76cff1:0x2d62f9e79fff1d72!2sAtl%C3%A2ntico+Golden+Apart+Hotel!5m4!1s2022-11-28!2i5!4m1!1i2!8m2!3d-23.9689349!4d-46.3302516!3m9!1s0x94ce03043613e3d9:0x72a1063f1eb9c819!5m4!1s2022-11-28!2i5!4m1!1i2!8m2!3d-23.9664557!4d-46.3300101"
+
+file_path = "input/hotels.csv"
 
 
-def scrape_reviews():
-    # Realizando post na api de reviews do front-end
-    token = ""
-    text = get_text(feature_id, token)
-    print("text[:100]\n", text[:100])
+@app.command()
+def main(path: str = file_path):
+    df = pd.read_csv(path, sep=",", encoding="utf-8")
+    for row in df.to_dict(orient="records"):
+        call_scraper(**row)
 
-    # Removendo css
-    text = cut_text(text)
-    print("text[:100]\n", text[:100])
 
-    # Salvando em arquivo
-    with open("text.html", "w", encoding="utf-8") as f:
-        f.writelines(text)
+def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str):
+    # Cria pasta se não existir
+    path = datetime.now().strftime("data/%Y/%m/%d/")
+    Path(path).mkdir(exist_ok=True, parents=True)
+    print("folder created")
 
-    # Iniciando soup e etree
-    soup = BeautifulSoup(text, "lxml")
-    dom = etree.HTML(soup.text)
-    tree = html.document_fromstring(text)
-    # tree = etree.fromstring(text)
+    file_name = str(name).strip().lower().replace(" ", "-")
+    file_name += "-gm-reviews.csv"
 
-    # Encontrando paths das tags da class review-full-text
-    node = soup.find(class_="review-full-text")
-    print("node.text\n", node.text)
-    nodes = soup.find_all(class_="review-full-text")
-    paths = [get_node_xpath(n) for n in nodes]
-    [print(path) for path in paths]
+    # Reseta arquivo
+    with open(path + file_name, "w") as f:
+        pass
 
-    # Iterando sobre texto de cada review
-    print("\n")
-    for i in range(1, 11):
-        print(f"div[{i}] text_content:")
-        t = tree.xpath(f"/html/body/div[1]/div/div[2]/div[4]/div/div[2]/div[{i}]")
-        t = t[0].text_content()
-        print(t, "\n")
+    # Cria csv writer
+    with open(path + file_name, "a+", encoding="utf-8", newline="\n") as file:
+        writer = csv.writer(file, quoting=csv.QUOTE_NONNUMERIC)
+        writer.writerow(review_default_result.keys())
+        print("header written")
 
-    # Encontrando número de reviews e token de próxima página
-    e = tree.xpath("//*[@data-google-review-count]")[0]
-    print("data-google-review-count:", e.attrib["data-google-review-count"])
-    token = e.attrib["data-next-page-token"]
-    print("data-next-page-token:", token)
-
-    # # Encontrando primeiro texto
-    # e = tree.xpath('//span[@class="review-full-text"]')[0]
-    # print("text:", e.text)
-    # es = tree.xpath('//span[@aria-label=contains(.,"Classificado como ")]')
-
-    print("\n ________ next token \n")
-
-    text = get_text(feature_id, token)
-    text = cut_text(text)
-    with open("text_next.html", "w", encoding="utf-8") as f:
-        f.writelines(text)
-
-    # Iniciando soup e etree
-    soup = BeautifulSoup(text, "lxml")
-    tree = html.document_fromstring(text)
-
-    # Iterando sobre texto de cada review
-    print("\n")
-    for i in range(1, 11):
-        print(f"div[{i}] text_content:")
-        t = tree.xpath(f"/html/body/div[1]/div/div[2]/div[4]/div/div[2]/div[{i}]")
-        t = t[0].text_content()
-        print(t, "\n")
+        scraper = GoogleMapsAPIScraper(hl=hl)
+        scraper.scrape_reviews(url, writer, file, n_reviews, sort_by=sort_by)
 
 
 if __name__ == "__main__":
-    scrape_reviews()
+    app()
