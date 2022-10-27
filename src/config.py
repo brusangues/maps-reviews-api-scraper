@@ -21,3 +21,15 @@ review_default_result = {
     "user_photos": 0,
     "text": "",
 }
+
+
+metadata_default = {
+    "feature_id": "",
+    "retrieval_date": "",
+    "place_name": "",
+    "address": "",
+    "overall_rating": 0,
+    "n_reviews": -1,
+    "topics": "",
+    "url": "",
+}

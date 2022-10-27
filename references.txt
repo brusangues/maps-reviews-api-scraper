@@ -4,3 +4,6 @@ https://gist.github.com/gruentee/203e4ba3791581070df9a4b1e6c55549
 https://beautiful-soup-4.readthedocs.io/en/latest/index.html?highlight=find#attrs
 https://github.com/emerson-matos/googlemaps-scraper/blob/main/monitor.py
 https://gist.github.com/IanHopkinson/ad45831a2fb73f537a79
+
+# Google api parameters
+https://serpapi.com/google-maps-reviews-api
