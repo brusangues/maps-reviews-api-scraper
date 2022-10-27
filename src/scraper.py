@@ -155,12 +155,27 @@ class GoogleMapsAPIScraper:
 
         # Parse text
         try:
+            # Find text block
             text_block = review.find(True, class_="review-full-text")
             if not text_block:
                 text_block = review.find(True, {"data-expandable-section": True})
-            if text_block and isinstance(text_block.contents[0], NavigableString):
-                text_block = text_block.text
-                result["text"] = re.sub('\s|"', " ", text_block)
+
+            # Extract text old
+            if text_block:
+                # if text_block and isinstance(text_block.contents[0], NavigableString):
+                #     text = text_block.text
+
+                text = ""
+                for e, s in zip(text_block.contents, text_block.stripped_strings):
+                    if isinstance(e, Tag) and e.has_attr(
+                        "class"
+                    ):  #  and e.attrs["class"] in ["review-snippet","k8MTF",]:
+                        break
+                    text += s + " "
+
+                text = re.sub("\s", " ", text)
+                text = re.sub("'|\"", "", text)
+                result["text"] = text
         except Exception as e:
             self.logger.error("error parsing text")
             self.logger.exception(e)
