@@ -5,6 +5,7 @@ from datetime import datetime
 import time
 import math
 import urllib.parse
+from pathlib import Path
 from lxml import etree, html
 from bs4 import BeautifulSoup, Tag, NavigableString, Comment
 import regex as re
@@ -16,6 +17,8 @@ default_hl = "pt-br"
 default_request_interval = 0.2
 default_n_retries = 3
 default_retry_time = 3
+
+Path("examples/").mkdir(exist_ok=True)
 
 
 class GoogleMapsAPIScraper:
@@ -188,6 +191,8 @@ class GoogleMapsAPIScraper:
             tb = f"review text:{tb}"
             self.logger.error(tb)
             result["errors"].append(tb)
+            with open("examples/error_text.html", "w", encoding="utf-8") as f:
+                f.writelines(str(review))
 
         # Parse review rating
         try:
@@ -201,6 +206,8 @@ class GoogleMapsAPIScraper:
             tb = f"review rating:{tb}"
             self.logger.error(tb)
             result["errors"].append(tb)
+            with open("examples/error_rating.html", "w", encoding="utf-8") as f:
+                f.writelines(str(review))
 
         # Parse other ratings
         try:
@@ -214,6 +221,8 @@ class GoogleMapsAPIScraper:
             tb = f"review other_ratings:{tb}"
             self.logger.error(tb)
             result["errors"].append(tb)
+            with open("examples/error_other_ratings.html", "w", encoding="utf-8") as f:
+                f.writelines(str(review))
 
         # Parse relative date
         try:
@@ -223,6 +232,8 @@ class GoogleMapsAPIScraper:
             tb = f"review relative_date:{tb}"
             self.logger.error(tb)
             result["errors"].append(tb)
+            with open("examples/error_relative_date.html", "w", encoding="utf-8") as f:
+                f.writelines(str(review))
 
         # Parse user name
         try:
@@ -232,6 +243,8 @@ class GoogleMapsAPIScraper:
             tb = f"review user_name:{tb}"
             self.logger.error(tb)
             result["errors"].append(tb)
+            with open("examples/error_user_name.html", "w", encoding="utf-8") as f:
+                f.writelines(str(review))
 
         # Parse user metadata
         try:
@@ -252,7 +265,7 @@ class GoogleMapsAPIScraper:
             tb = f"review user data:{tb}"
             self.logger.error(tb)
             result["errors"].append(tb)
-            with open("examples/error_user.html", "w", encoding="utf-8") as f:
+            with open("examples/error_user_data.html", "w", encoding="utf-8") as f:
                 f.writelines(str(review))
 
         # Parse review id
@@ -265,6 +278,8 @@ class GoogleMapsAPIScraper:
             tb = f"review review_id:{tb}"
             self.logger.error(tb)
             result["errors"].append(tb)
+            with open("examples/error_review_id.html", "w", encoding="utf-8") as f:
+                f.writelines(str(review))
 
         # Make timestamp
         result["retrieval_date"] = str(datetime.now())

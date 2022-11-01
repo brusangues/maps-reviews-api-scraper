@@ -10,6 +10,15 @@ Para rodar sequencialmente:
 Para rodar com múltiplas threads em paralelo:  
 ```python -m app run-async --path input/hotels.csv```
 
+# Input
+O csv de input deve ser preenchido com os seguintes campos obrigatórios:
+ - done: Flag 0 ou 1 indicando se a linha já foi processada. Alterar manualmente.
+ - name: Nome arbitrário para o hotel/linha.
+ - n_reviews: Número de reviews a ser buscado. Pode exceder o máximo, pois o scraper para automaticamente.
+ - sort_by: Tipo de ordenação. Veja o arquivo config.py para as opções disponíveis.
+ - hl: Código de idioma. Representa o idioma base dos reviews buscados.
+ - url: Url base para a busca. **Para obter o url, pesquise no google o nome do hotel + maps, e encontre o link do google maps para o hotel. Copie e cole o primeiro url que encontrar.** Exemplo: https://www.google.com/maps/place/...
+
 # Manual de utilização do scraper localmente no windows
 
 Para a instalação do python, recomendo a utilização do miniconda, para utilização de ambientes virtuais, como mostro no passo a passo abaixo.
