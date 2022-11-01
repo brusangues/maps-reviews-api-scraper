@@ -363,9 +363,7 @@ class GoogleMapsAPIScraper:
             time.sleep(self.request_interval)
 
         self.logger.info(
-            "Done Scraping Reviews\n"
-            f"Requests made: {n_requests}\n"
-            f"Reviews parsed: {j}"
+            f"Done Scraping Reviews\nRequests made: {i}\nReviews parsed: {j}"
         )
 
         return results

@@ -4,5 +4,5 @@ lxml
 regex
 requests
 typer
-openpyxl
-pyarrow
+# openpyxl
+# pyarrow

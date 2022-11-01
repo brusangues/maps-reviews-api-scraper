@@ -1,1 +1,0 @@
-python -m app run-async --path input/hotels.csv
