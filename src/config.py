@@ -20,6 +20,7 @@ review_default_result = {
     "user_comments": 0,
     "user_photos": 0,
     "text": "",
+    "errors": [],
 }
 
 

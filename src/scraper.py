@@ -4,7 +4,6 @@ from lxml import etree, html
 from bs4 import BeautifulSoup, Tag, NavigableString, Comment
 import regex as re
 from typing import Union
-import logging
 import traceback
 from datetime import datetime
 import time
@@ -19,11 +18,15 @@ class GoogleMapsAPIScraper:
     def __init__(
         self,
         hl: str = "pt-br",
-        request_interval: float = 1,
+        request_interval: float = 0.2,
         n_retries: int = 3,
         retry_time: float = 3,
+        logger=None,
     ):
-        self.logger = get_logger("google_maps_api_scraper")
+        if not logger is None:
+            self.logger = logger
+        else:
+            self.logger = get_logger("google_maps_api_scraper")
         self.hl = hl
         self.request_interval = request_interval
         self.n_retries = n_retries
@@ -177,8 +180,10 @@ class GoogleMapsAPIScraper:
                 text = re.sub("'|\"", "", text)
                 result["text"] = text
         except Exception as e:
-            self.logger.error("error parsing text")
-            self.logger.exception(e)
+            tb = re.sub("\s", " ", traceback.format_exc())
+            tb = f"review text:{tb}"
+            self.logger.error(tb)
+            result["errors"].append(tb)
 
         # Parse review rating
         try:
@@ -188,8 +193,10 @@ class GoogleMapsAPIScraper:
             result["rating"] = float(rating[0])
             result["rating_max"] = float(rating[1])
         except Exception as e:
-            self.logger.error("error parsing rating")
-            self.logger.exception(e)
+            tb = re.sub("\s", " ", traceback.format_exc())
+            tb = f"review rating:{tb}"
+            self.logger.error(tb)
+            result["errors"].append(tb)
 
         # Parse other ratings
         try:
@@ -199,22 +206,28 @@ class GoogleMapsAPIScraper:
                     [s for s in other_ratings.stripped_strings]
                 )
         except Exception as e:
-            self.logger.error("error parsing other_ratings")
-            self.logger.exception(e)
+            tb = re.sub("\s", " ", traceback.format_exc())
+            tb = f"review other_ratings:{tb}"
+            self.logger.error(tb)
+            result["errors"].append(tb)
 
         # Parse relative date
         try:
             result["relative_date"] = review.find(True, class_="dehysf lTi8oc").text
         except Exception as e:
-            self.logger.error("error parsing relative_date")
-            self.logger.exception(e)
+            tb = re.sub("\s", " ", traceback.format_exc())
+            tb = f"review relative_date:{tb}"
+            self.logger.error(tb)
+            result["errors"].append(tb)
 
         # Parse user name
         try:
             result["user_name"] = review.find(True, class_="TSUbDb").text
         except Exception as e:
-            self.logger.error("error parsing user_name")
-            self.logger.exception(e)
+            tb = re.sub("\s", " ", traceback.format_exc())
+            tb = f"review user_name:{tb}"
+            self.logger.error(tb)
+            result["errors"].append(tb)
 
         # Parse user metadata
         try:
@@ -231,8 +244,10 @@ class GoogleMapsAPIScraper:
                 if len(user_photos) == 1:
                     result["user_photos"] = int(user_photos[0])
         except Exception as e:
-            self.logger.error("error parsing user metadata")
-            self.logger.exception(e)
+            tb = re.sub("\s", " ", traceback.format_exc())
+            tb = f"review user data:{tb}"
+            self.logger.error(tb)
+            result["errors"].append(tb)
             with open("examples/error_user.html", "w", encoding="utf-8") as f:
                 f.writelines(str(review))
 
@@ -242,8 +257,10 @@ class GoogleMapsAPIScraper:
             review_id = review.find(True, class_="RvU3D").get("href")
             result["review_id"] = re.findall("(?<=postId=).*?(?=&)", review_id)[0]
         except Exception as e:
-            self.logger.error("error parsing review_id")
-            self.logger.exception(e)
+            tb = re.sub("\s", " ", traceback.format_exc())
+            tb = f"review review_id:{tb}"
+            self.logger.error(tb)
+            result["errors"].append(tb)
 
         # Make timestamp
         result["retrieval_date"] = str(datetime.now())
@@ -334,11 +351,11 @@ class GoogleMapsAPIScraper:
                 self.logger.error(f"error parsing request: {i}")
                 self.logger.exception(e)
 
-            if review_count < 10:
+            if review_count < 10 or token == "":
                 self.logger.info(f"Place review limit at {j}")
                 break
 
-            # Waiting so google wont block this ip
+            # Waiting so google wont block this scraper
             time.sleep(self.request_interval)
 
         self.logger.info(

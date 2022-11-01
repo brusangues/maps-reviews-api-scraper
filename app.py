@@ -1,15 +1,16 @@
-from lxml import etree, html
-from bs4 import BeautifulSoup
 from datetime import datetime
 from pathlib import Path
-from src.scraper import GoogleMapsAPIScraper
-from src.config import review_default_result, metadata_default
 import csv
 import pandas as pd
 import typer
 from multiprocessing import Pool
 
+from src.scraper import GoogleMapsAPIScraper
+from src.config import review_default_result, metadata_default
+from src.customlogger import get_logger
+
 app = typer.Typer()
+logger = get_logger("google_maps_api_scraper")
 
 # hl = "pt-br"
 # n_reviews = 40
@@ -26,6 +27,7 @@ places_path = "data/places.csv"
 def run(path: str = file_path):
     print("Running async")
     df = pd.read_csv(path, sep=",", encoding="utf-8")
+    df = df.loc[df.done == 0]
     for row in df.to_dict(orient="records"):
         call_scraper(**row)
 
@@ -34,6 +36,7 @@ def run(path: str = file_path):
 def run_async(path: str = file_path):
     print("Running async")
     df = pd.read_csv(path, sep=",", encoding="utf-8")
+    df = df.loc[df.done == 0]
     results = []
     with Pool(processes=n_processes) as pool:
         for row in df.to_dict(orient="records"):
@@ -45,7 +48,7 @@ def run_async(path: str = file_path):
         [result.wait() for result in results]
 
 
-def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str):
+def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **kwargs):
     # Create date folder
     path = datetime.now().strftime("data/%Y/%m/%d/")
     Path(path).mkdir(exist_ok=True, parents=True)
@@ -56,11 +59,11 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str):
     file_name += "-gm-reviews.csv"
 
     # Clear file contents
-    with open(path + file_name, "w") as f:
-        pass
+    # with open(path + file_name, "w") as f:
+    #     pass
 
     # Create scraper object
-    scraper = GoogleMapsAPIScraper(hl=hl)
+    scraper = GoogleMapsAPIScraper(hl=hl, logger=logger)
 
     # Create csv writer for metadata
     write_places_header = not Path(places_path).exists()
