@@ -1,26 +1,30 @@
-from typing import List, Tuple
+from typing import List, Tuple, Union
 import requests
-from lxml import etree, html
-from bs4 import BeautifulSoup, Tag, NavigableString, Comment
-import regex as re
-from typing import Union
 import traceback
 from datetime import datetime
 import time
 import math
 import urllib.parse
+from lxml import etree, html
+from bs4 import BeautifulSoup, Tag, NavigableString, Comment
+import regex as re
 
 from src.customlogger import get_logger
 from src.config import sort_by_enum, review_default_result, metadata_default
+
+default_hl = "pt-br"
+default_request_interval = 0.2
+default_n_retries = 3
+default_retry_time = 3
 
 
 class GoogleMapsAPIScraper:
     def __init__(
         self,
-        hl: str = "pt-br",
-        request_interval: float = 0.2,
-        n_retries: int = 3,
-        retry_time: float = 3,
+        hl: str = default_hl,
+        request_interval: float = default_request_interval,
+        n_retries: int = default_n_retries,
+        retry_time: float = default_retry_time,
         logger=None,
     ):
         if not logger is None:

@@ -1,11 +1,8 @@
-matplotlib 
 pandas 
-jupyter 
-scikit-learn 
-nltk 
-tqdm
-pyLDAvis
-gensim
-pyarrow
-selenium
+beautifulsoup4
+lxml
+regex
 requests
+typer
+openpyxl
+pyarrow
