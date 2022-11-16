@@ -363,7 +363,7 @@ class GoogleMapsAPIScraper:
 
             try:
                 for review in reviews_soup:
-                    self.logger.info(f"Parsing review: {j:>8}")
+                    # self.logger.info(f"Parsing review: {j:>8}")
                     result = self._parse_review(review)
                     result["token"] = token
 
