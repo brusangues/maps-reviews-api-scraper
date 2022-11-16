@@ -151,7 +151,9 @@ class GoogleMapsAPIScraper:
 
         # Parse topics
         try:
-            metadata["topics"] = response.find("localreviews-place-topics").get_text()
+            topics = response.find("localreviews-place-topics")
+            s = " ".join([s for s in topics.stripped_strings])
+            metadata["topics"] = re.sub("\s+", " ", s)
         except Exception as e:
             self.logger.error("error parsing place: topics")
             self.logger.exception(e)
@@ -159,6 +161,31 @@ class GoogleMapsAPIScraper:
         metadata["retrieval_date"] = str(datetime.now())
 
         return metadata
+
+    def _parse_review_text(self, text_block) -> str:
+        text = ""
+        for e, s in zip(text_block.contents, text_block.stripped_strings):
+            if isinstance(e, Tag) and e.has_attr(
+                "class"
+            ):  #  and e.attrs["class"] in ["review-snippet","k8MTF",]:
+                break
+            text += s + " "
+
+        text = re.sub("\s", " ", text)
+        text = re.sub("'|\"", "", text)
+        text = text.strip()
+        return text
+
+    def _handle_review_exception(self, result, review, name) -> dict:
+        tb = re.sub("\s", " ", traceback.format_exc())
+        tb = f"review {name}:{tb}"
+        self.logger.error(tb)
+        tb = re.sub("['\"]", " ", tb)
+        result["errors"].append(tb)
+        ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f")
+        with open(f"examples/error_{name}_{ts}.html", "w", encoding="utf-8") as f:
+            f.writelines(str(review))
+        return result
 
     def _parse_review(self, review: Tag):
         result = review_default_result.copy()
@@ -169,30 +196,11 @@ class GoogleMapsAPIScraper:
             text_block = review.find(True, class_="review-full-text")
             if not text_block:
                 text_block = review.find(True, {"data-expandable-section": True})
-
-            # Extract text old
+            # Extract text
             if text_block:
-                # if text_block and isinstance(text_block.contents[0], NavigableString):
-                #     text = text_block.text
-
-                text = ""
-                for e, s in zip(text_block.contents, text_block.stripped_strings):
-                    if isinstance(e, Tag) and e.has_attr(
-                        "class"
-                    ):  #  and e.attrs["class"] in ["review-snippet","k8MTF",]:
-                        break
-                    text += s + " "
-
-                text = re.sub("\s", " ", text)
-                text = re.sub("'|\"", "", text)
-                result["text"] = text
+                result["text"] = self._parse_review_text(text_block)
         except Exception as e:
-            tb = re.sub("\s", " ", traceback.format_exc())
-            tb = f"review text:{tb}"
-            self.logger.error(tb)
-            result["errors"].append(tb)
-            with open("examples/error_text.html", "w", encoding="utf-8") as f:
-                f.writelines(str(review))
+            self._handle_review_exception(result, review, "text")
 
         # Parse review rating
         try:
@@ -202,49 +210,28 @@ class GoogleMapsAPIScraper:
             result["rating"] = float(rating[0])
             result["rating_max"] = float(rating[1])
         except Exception as e:
-            tb = re.sub("\s", " ", traceback.format_exc())
-            tb = f"review rating:{tb}"
-            self.logger.error(tb)
-            result["errors"].append(tb)
-            with open("examples/error_rating.html", "w", encoding="utf-8") as f:
-                f.writelines(str(review))
+            self._handle_review_exception(result, review, "rating")
 
         # Parse other ratings
         try:
             other_ratings = review.find(True, class_="k8MTF")
             if other_ratings:
-                result["other_ratings"] = "".join(
-                    [s for s in other_ratings.stripped_strings]
-                )
+                s = " ".join([s for s in other_ratings.stripped_strings])
+                result["other_ratings"] = re.sub("\s+", " ", s)
         except Exception as e:
-            tb = re.sub("\s", " ", traceback.format_exc())
-            tb = f"review other_ratings:{tb}"
-            self.logger.error(tb)
-            result["errors"].append(tb)
-            with open("examples/error_other_ratings.html", "w", encoding="utf-8") as f:
-                f.writelines(str(review))
+            self._handle_review_exception(result, review, "other_ratings")
 
         # Parse relative date
         try:
             result["relative_date"] = review.find(True, class_="dehysf lTi8oc").text
         except Exception as e:
-            tb = re.sub("\s", " ", traceback.format_exc())
-            tb = f"review relative_date:{tb}"
-            self.logger.error(tb)
-            result["errors"].append(tb)
-            with open("examples/error_relative_date.html", "w", encoding="utf-8") as f:
-                f.writelines(str(review))
+            self._handle_review_exception(result, review, "relative_date")
 
         # Parse user name
         try:
             result["user_name"] = review.find(True, class_="TSUbDb").text
         except Exception as e:
-            tb = re.sub("\s", " ", traceback.format_exc())
-            tb = f"review user_name:{tb}"
-            self.logger.error(tb)
-            result["errors"].append(tb)
-            with open("examples/error_user_name.html", "w", encoding="utf-8") as f:
-                f.writelines(str(review))
+            self._handle_review_exception(result, review, "user_name")
 
         # Parse user metadata
         try:
@@ -254,19 +241,16 @@ class GoogleMapsAPIScraper:
                 result["user_is_local_guide"] = (
                     True if user_node.find(True, class_="QV3IV") else False
                 )
-                user_comments = re.findall("[0-9]+(?= comentários)", user_node.text)
-                if len(user_comments) == 1:
-                    result["user_comments"] = int(user_comments[0])
-                user_photos = re.findall("[0-9]+(?= fotos)", user_node.text)
-                if len(user_photos) == 1:
-                    result["user_photos"] = int(user_photos[0])
+                user_reviews = re.findall(
+                    "[Uuma0-9.,]+(?= comentário| review)", user_node.text
+                )
+                user_photos = re.findall("[Uuma0-9.,]+(?= foto| photo)", user_node.text)
+                if len(user_reviews) > 0:
+                    result["user_reviews"] = user_reviews[0]
+                if len(user_photos) > 0:
+                    result["user_photos"] = user_photos[0]
         except Exception as e:
-            tb = re.sub("\s", " ", traceback.format_exc())
-            tb = f"review user data:{tb}"
-            self.logger.error(tb)
-            result["errors"].append(tb)
-            with open("examples/error_user_data.html", "w", encoding="utf-8") as f:
-                f.writelines(str(review))
+            self._handle_review_exception(result, review, "user_data")
 
         # Parse review id
         try:
@@ -274,12 +258,35 @@ class GoogleMapsAPIScraper:
             review_id = review.find(True, class_="RvU3D").get("href")
             result["review_id"] = re.findall("(?<=postId=).*?(?=&)", review_id)[0]
         except Exception as e:
-            tb = re.sub("\s", " ", traceback.format_exc())
-            tb = f"review review_id:{tb}"
-            self.logger.error(tb)
-            result["errors"].append(tb)
-            with open("examples/error_review_id.html", "w", encoding="utf-8") as f:
-                f.writelines(str(review))
+            self._handle_review_exception(result, review, "review_id")
+
+        # Parse review likes
+        try:
+            review_likes = review.find(True, jsname="CMh1ye")
+            if review_likes:
+                result["likes"] = int(review_likes.text)
+        except Exception as e:
+            self._handle_review_exception(result, review, "likes")
+
+        # Parse review response
+        try:
+            response = review.find(True, class_="d6SCIc")
+            if response:
+                result["response_text"] = self._parse_review_text(response)
+            response_date = review.find(True, class_="pi8uOe")
+            if response_date:
+                result["response_relative_date"] = response_date.text
+        except Exception as e:
+            self._handle_review_exception(result, review, "response")
+
+        # Parse trip_type_travel_group
+        try:
+            trip_type_travel_group = review.find(True, class_="PV7e7")
+            if trip_type_travel_group:
+                s = " ".join([s for s in trip_type_travel_group.stripped_strings])
+                result["trip_type_travel_group"] = re.sub("\s+", " ", s)
+        except Exception as e:
+            self._handle_review_exception(result, review, "trip_type_travel_group")
 
         # Make timestamp
         result["retrieval_date"] = str(datetime.now())
@@ -378,7 +385,7 @@ class GoogleMapsAPIScraper:
             time.sleep(self.request_interval)
 
         self.logger.info(
-            f"Done Scraping Reviews\nRequests made: {i}\nReviews parsed: {j}"
+            f"Done Scraping Reviews\nRequests made: {i+1}\nReviews parsed: {j}"
         )
 
         return results

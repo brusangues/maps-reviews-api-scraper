@@ -12,14 +12,18 @@ review_default_result = {
     "retrieval_date": "",
     "rating": 0,  # float usually 1-5
     "rating_max": 0,  # float usually 5
+    "relative_date": "",  # string containing the localized relative date
+    "likes": -1,  # review likes if exists
     "other_ratings": "",  # other ratings such as rooms, service, placing, etc
-    "relative_date": "",
+    "trip_type_travel_group": "",
     "user_name": "",
-    "user_url": "",
     "user_is_local_guide": None,
-    "user_comments": 0,  # number of user comments
-    "user_photos": 0,  # number of user photos
+    "user_reviews": "",  # total number of reviews made by the user
+    "user_photos": "",  # total number of photos added by the user
+    "user_url": "",
     "text": "",  # review text if exists
+    "response_text": "",  # owner response text if exists
+    "response_relative_date": "",  # string containing the localized relative date
     "errors": [],  # list of errors parsing review
 }
 
