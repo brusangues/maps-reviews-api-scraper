@@ -14,7 +14,7 @@ Para rodar com múltiplas threads em paralelo:
 O csv de input deve ser preenchido com os seguintes campos obrigatórios:
  - done: Flag 0 ou 1 indicando se a linha já foi processada. Alterar manualmente.
  - name: Nome arbitrário para o hotel/linha.
- - n_reviews: Número de reviews a ser buscado. Pode exceder o máximo, pois o scraper para automaticamente.
+ - n_reviews: Número de reviews a ser buscado. Pode exceder o máximo, pois o scraper para automaticamente. Se for negativo, o scraper pega todos os reviews possíveis.
  - sort_by: Tipo de ordenação. Veja o arquivo config.py para as opções disponíveis.
  - hl: Código de idioma. Representa o idioma base dos reviews buscados.
  - url: Url base para a busca. **Para obter o url, pesquise no google o nome do hotel + maps, e encontre o link do google maps para o hotel. Copie e cole o primeiro url que encontrar.** Exemplo: https://www.google.com/maps/place/...
