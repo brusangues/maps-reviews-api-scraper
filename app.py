@@ -12,7 +12,7 @@ from src.customlogger import get_logger
 app = typer.Typer()
 logger = get_logger("google_maps_api_scraper")
 
-n_processes = 4
+n_processes = 8
 file_path = "input/hotels.csv"
 places_path = "data/places.csv"
 
@@ -66,7 +66,11 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
         if write_places_header:
             writer.writerow(metadata_default.keys())
 
-        scraper.scrape_place(url, writer, file)
+        metadata = scraper.scrape_place(url, writer, file)
+
+    # Changes n_reviews
+    if n_reviews < 0:
+        n_reviews = metadata["n_reviews"]
 
     # Create csv writer and start scraping
     with open(path + file_name, "a+", encoding="utf-8", newline="\n") as file:
