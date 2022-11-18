@@ -1,9 +1,11 @@
 from datetime import datetime
 from pathlib import Path
 import csv
+import json
 from multiprocessing import Pool
 import pandas as pd
 import typer
+import traceback
 
 from src.scraper import GoogleMapsAPIScraper
 from src.config import review_default_result, metadata_default
@@ -50,10 +52,11 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
 
     # Make filename
     file_name = str(name).strip().lower().replace(" ", "-")
-    file_name += "-gm-reviews.csv"
+    reviews_file_name = file_name + "-gm-reviews.csv"
+    place_file_name = file_name + "-gm-reviews.json"
 
     # Clear file contents
-    # with open(path + file_name, "w") as f:
+    # with open(path + reviews_file_name, "w") as f:
     #     pass
 
     # Create scraper object
@@ -68,17 +71,25 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
 
         metadata = scraper.scrape_place(url, writer, file)
 
+    # Create json for metadata
+    with open(path + place_file_name, "w", encoding="latin1") as f:
+        json.dump(metadata, f, indent=4)
+
     # Changes n_reviews
     if n_reviews < 0:
         n_reviews = metadata["n_reviews"]
 
     # Create csv writer and start scraping
-    with open(path + file_name, "a+", encoding="utf-8", newline="\n") as file:
+    with open(path + reviews_file_name, "a+", encoding="utf-8", newline="\n") as file:
         writer = csv.writer(file, quoting=csv.QUOTE_NONNUMERIC)
         writer.writerow(review_default_result.keys())
         print("header written")
 
-        scraper.scrape_reviews(url, writer, file, n_reviews, sort_by=sort_by)
+        try:
+            scraper.scrape_reviews(url, writer, file, n_reviews, sort_by=sort_by)
+        except Exception as e:
+            print(traceback.print_exc())
+            raise e
 
 
 if __name__ == "__main__":

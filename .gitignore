@@ -1,4 +1,7 @@
-data/**.pq
+data/**/*.csv
+data/**/*.pq
+data/**/*.parquet
+data/**/*.json
 data/**.parquet
 __pycache__
 
@@ -109,5 +112,4 @@ venv.bak/
 
 # other
 test/
-data/**/*.csv
 .DS_Store

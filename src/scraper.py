@@ -14,9 +14,9 @@ from src.customlogger import get_logger
 from src.config import sort_by_enum, review_default_result, metadata_default
 
 default_hl = "pt-br"
-default_request_interval = 0.2
-default_n_retries = 3
-default_retry_time = 3
+default_request_interval = 0.5
+default_n_retries = 10
+default_retry_time = 5
 
 Path("examples/").mkdir(exist_ok=True)
 
@@ -82,15 +82,22 @@ class GoogleMapsAPIScraper:
         )
         # Make request
         response = requests.get(query)
+        response.raise_for_status()
+
         # Decode response
-        response = response.content.decode(encoding="unicode_escape")
+        response_text = response.content.decode(encoding="unicode_escape")
+        if response_text is None or response_text == "":
+            raise Exception(
+                "Response text is none. Try request again."
+                f"Response: {response} Status: {response.status_code}"
+            )
 
         # Cut response to remove css
-        response = self._cut_response(response)
+        response_text = self._cut_response(response_text)
 
         # Send page to soup and trees
-        response_soup = BeautifulSoup(response, "lxml")
-        tree = html.document_fromstring(response)
+        response_soup = BeautifulSoup(response_text, "lxml")
+        tree = html.document_fromstring(response_text)
         # soup = BeautifulSoup(response, "html.parser")
         # dom = etree.HTML(response_soup.text)
 
@@ -103,7 +110,7 @@ class GoogleMapsAPIScraper:
         reviews_tree = tree.xpath("/html/body/div[1]/div/div[2]/div[4]/div/div[2]/div")
         reviews_soup = [response_soup.find("div", dict(r.attrib)) for r in reviews_tree]
 
-        return response_soup, reviews_soup, review_count, next_token
+        return response, response_soup, reviews_soup, review_count, next_token
 
     def _cut_response(self, text: str) -> str:
         idx_first_div = text.find("<div ")
@@ -347,7 +354,7 @@ class GoogleMapsAPIScraper:
             n = self.n_retries
             while n > 0:
                 try:
-                    _, reviews_soup, review_count, token = self._get_api_response(
+                    _, _, reviews_soup, review_count, token = self._get_api_response(
                         feature_id,
                         hl=hl,
                         sort_by_id=sort_by_id,
@@ -355,11 +362,16 @@ class GoogleMapsAPIScraper:
                     )
                     break
                 except Exception as e:
-                    self.logger.error(f"error on request: {i}")
-                    self.logger.exception(e)
+                    n -= 1
+                    if n == 0:
+                        self.logger.exception("Max retries exceeded. Ending scraping.")
+                        raise e
+                    tb = re.sub("\s", " ", traceback.format_exc())
+                    self.logger.info(
+                        f"error making request: {i} exception: {e} tb: {tb}"
+                    )
                     self.logger.info(f"waiting {self.retry_time} seconds")
                     time.sleep(self.retry_time)
-                    n -= 1
 
             try:
                 for review in reviews_soup:
@@ -374,8 +386,8 @@ class GoogleMapsAPIScraper:
                     # self.logger.info(results)
                     j += 1
             except Exception as e:
-                self.logger.error(f"error parsing request: {i}")
-                self.logger.exception(e)
+                tb = re.sub("\s", " ", traceback.format_exc())
+                self.logger.info(f"error parsing request: {i} exception: {e} tb: {tb}")
 
             if review_count < 10 or token == "":
                 self.logger.info(f"Place review limit at {j}")
@@ -404,7 +416,7 @@ class GoogleMapsAPIScraper:
         feature_id = self._parse_url_to_feature_id(url)
 
         self.logger.info(f"Parsing metadata...")
-        response_soup, _, _, _ = self._get_api_response(
+        _, response_soup, _, _, _ = self._get_api_response(
             feature_id,
             hl=hl,
         )

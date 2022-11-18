@@ -5,12 +5,30 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "app.py",
+            "name": "run",
             "type": "python",
             "request": "launch",
-            "program": "app.py",
             "console": "integratedTerminal",
-            "justMyCode": true
+            "justMyCode": true,
+            "module": "app",
+            "args": [
+                "run",
+                "--path",
+                "input/hotels.csv"
+            ]
+        },
+        {
+            "name": "run-async",
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "module": "app",
+            "args": [
+                "run-async",
+                "--path",
+                "input/hotels.csv"
+            ]
         }
     ]
 }
