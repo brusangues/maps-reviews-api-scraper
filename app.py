@@ -69,7 +69,7 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
         if write_places_header:
             writer.writerow(metadata_default.keys())
 
-        metadata = scraper.scrape_place(url, writer, file)
+        metadata = scraper.scrape_place(url, writer, file, name)
 
     # Create json for metadata
     with open(path + place_file_name, "w", encoding="latin1") as f:

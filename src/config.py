@@ -29,12 +29,13 @@ review_default_result = {
 
 
 metadata_default = {
+    "name": "",  # hotel name in hotels manual input
     "feature_id": "",  # hotel unique id
     "retrieval_date": "",
-    "place_name": "",
+    "place_name": "",  # Place name extracted from response
     "address": "",
     "overall_rating": 0,  # float usually 1-5
-    "n_reviews": -1,  # number of reviews
+    "n_reviews": -1,  # number of reviews of hotel
     "topics": "",  # topics separated by number of reviews
     "url": "",  # hotel url
 }

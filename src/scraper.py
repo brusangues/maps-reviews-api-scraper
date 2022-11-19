@@ -407,6 +407,7 @@ class GoogleMapsAPIScraper:
         url: str,
         writer,
         file,
+        name,
         hl: str = "",
     ):
         url_name = re.findall("(?<=place/).*?(?=/)", url)[0]
@@ -423,6 +424,7 @@ class GoogleMapsAPIScraper:
         metadata = self._parse_place(response=response_soup)
         metadata["feature_id"] = feature_id
         metadata["url"] = url
+        metadata["name"] = name
 
         writer.writerow(metadata.values())
         file.flush()
