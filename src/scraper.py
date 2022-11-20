@@ -16,7 +16,7 @@ from src.config import sort_by_enum, review_default_result, metadata_default
 default_hl = "pt-br"
 default_request_interval = 0.5
 default_n_retries = 10
-default_retry_time = 5
+default_retry_time = 30
 
 Path("examples/").mkdir(exist_ok=True)
 
@@ -194,6 +194,15 @@ class GoogleMapsAPIScraper:
             f.writelines(str(review))
         return result
 
+    def _handle_place_exception(self, review, name) -> dict:
+        tb = re.sub("\s", " ", traceback.format_exc())
+        tb = f"place {name}:{tb}"
+        self.logger.error(tb)
+        tb = re.sub("['\"]", " ", tb)
+        ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f")
+        with open(f"examples/error_{name}_{ts}.html", "w", encoding="utf-8") as f:
+            f.writelines(str(review))
+
     def _parse_review(self, review: Tag):
         result = review_default_result.copy()
 
@@ -364,11 +373,17 @@ class GoogleMapsAPIScraper:
                 except Exception as e:
                     n -= 1
                     if n == 0:
-                        self.logger.exception("Max retries exceeded. Ending scraping.")
+                        self._handle_place_exception(reviews_soup, url_name)
+                        self.logger.exception(
+                            f"Max retries exceeded."
+                            f"\nEnding scraping hotel: {url_name}"
+                            f"\nRequests made: {i+1}\nReviews parsed: {j}"
+                        )
                         raise e
                     tb = re.sub("\s", " ", traceback.format_exc())
                     self.logger.info(
-                        f"error making request: {i} exception: {e} tb: {tb}"
+                        f"error in hotel: {url_name} making request: {i}"
+                        f"exception: {e} tb: {tb}"
                     )
                     self.logger.info(f"waiting {self.retry_time} seconds")
                     time.sleep(self.retry_time)
