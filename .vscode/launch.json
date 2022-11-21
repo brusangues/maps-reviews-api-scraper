@@ -5,6 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Analisys",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "30"
+            }
+        },
+        {
             "name": "run",
             "type": "python",
             "request": "launch",
@@ -15,7 +26,10 @@
                 "run",
                 "--path",
                 "input/hotels.csv"
-            ]
+            ],
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "30"
+            }
         },
         {
             "name": "run-async",
@@ -28,7 +42,10 @@
                 "run-async",
                 "--path",
                 "input/hotels.csv"
-            ]
+            ],
+            "env": {
+                "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "30"
+            }
         }
     ]
 }
