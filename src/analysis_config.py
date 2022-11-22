@@ -46,6 +46,49 @@ agg_dict = {
     "response_relative_date": "count",
 }
 
+feature_cols = [
+    # Input
+    "hl",
+    "state",
+    "region",
+    "stars",
+    # Metadata
+    "place_name",
+    "topics",
+    # Reviews
+    "review_id",
+    "retrieval_date",
+    "rating",
+    "relative_date",
+    "likes",
+    "other_ratings",
+    "trip_type_travel_group",
+    "user_name",
+    "user_is_local_guide",
+    "user_reviews",
+    "user_photos",
+    "text",
+    "response_text",
+    "response_relative_date",
+]
+
+text_cols = [
+    # Input
+    "hl",
+    # Metadata
+    "place_name",
+    "topics",
+    # Reviews
+    "review_id",
+    "retrieval_date",
+    "relative_date",
+    "other_ratings",
+    "trip_type_travel_group",
+    "text",
+    "response_text",
+    "response_relative_date",
+]
+
 
 full_cols = [
     # Input
@@ -87,3 +130,20 @@ full_cols = [
     "response_relative_date",
     "errors",
 ]
+
+time_unit_map = {
+    "ano": "years",
+    "anos": "years",
+    "mes": "months",
+    "meses": "months",
+    "semana": "weeks",
+    "semanas": "weeks",
+    "dia": "days",
+    "dias": "days",
+    "hora": "hours",
+    "horas": "hours",
+    "minuto": "minutes",
+    "minutos": "minutes",
+    "segundo": "seconds",
+    "segundos": "seconds",
+}
