@@ -19,6 +19,7 @@ default_n_retries = 10
 default_retry_time = 30
 
 Path("examples/").mkdir(exist_ok=True)
+Path("errors/").mkdir(exist_ok=True)
 
 
 class GoogleMapsAPIScraper:
@@ -47,10 +48,11 @@ class GoogleMapsAPIScraper:
             traceback.print_exception(exc_type, exc_value, tb)
             self.logger.exception(exc_value)
 
-        self.driver.close()
-        self.driver.quit()
-
         return True
+
+    def _ts(self) -> str:
+        """Returns timestamp formatted as string safe for file naming"""
+        return datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f")
 
     def _parse_url_to_feature_id(self, url: str) -> str:
         return re.findall("0[xX][0-9a-fA-F]+:0[xX][0-9a-fA-F]+", url)[0]
@@ -59,7 +61,73 @@ class GoogleMapsAPIScraper:
         """Default to newest"""
         return sort_by_enum.get(sort_by, 1)
 
-    def _get_api_response(
+    def _decode_response(self, response) -> str:
+        """Decodes response bytes in unicode escape encoding"""
+        try:
+            response_text = response.content.decode(encoding="unicode_escape")
+        except UnicodeDecodeError as e:
+            tb = re.sub("\s", " ", traceback.format_exc())
+            self.logger.info(f"UnicodeDecodeError. Replacing errors. {tb}")
+            response_text = response.content.decode(
+                encoding="unicode_escape", errors="replace"
+            )
+        if response_text is None or response_text == "":
+            raise Exception(
+                "Response text is none. Try request again."
+                f"Response: {response} Status: {response.status_code}"
+            )
+        return response_text
+
+    def _cut_response_text(self, text: str) -> str:
+        """Cut response text to remove css and js from extremities"""
+        idx_first_div = text.find("<div")
+        if idx_first_div == -1:
+            self.logger.info("first div not found")
+            idx_first_div = 0
+        match = re.search("</div", text, flags=re.REVERSE)
+        if match:
+            idx_last_div = match.span()[1] + 1
+        else:
+            self.logger.info("last div not found")
+            idx_last_div = -1
+        text = text[idx_first_div:idx_last_div]
+        return "<html><body>" + text + "</body></html>"
+
+    def _format_response_text(self, response_text: str):
+        """Transforms text into soup and extract list of reviews"""
+        response_soup = reviews_soup = review_count = next_token = None
+        try:
+            # Send page to soup and trees
+            response_soup = BeautifulSoup(response_text, "lxml")
+            tree = html.document_fromstring(response_text)
+
+            # Encontrando número de reviews e token de próxima página
+            metadata_node = tree.xpath("//*[@data-google-review-count]")[0]
+            review_count = int(metadata_node.attrib["data-google-review-count"])
+            next_token = metadata_node.attrib["data-next-page-token"]
+
+            # Iterando sobre texto de cada review
+            reviews_tree = tree.xpath(
+                "/html/body/div[1]/div/div[2]/div[4]/div/div[2]/div"
+            )
+            reviews_soup = [
+                response_soup.find("div", dict(r.attrib)) for r in reviews_tree
+            ]
+        except Exception as e:
+            tb = re.sub("\s", " ", traceback.format_exc())
+            self.logger.info(f"Response formatting error: {tb}")
+            if next_token is None:
+                next_token = self._get_response_token(response_text)
+
+        return response_text, response_soup, reviews_soup, review_count, next_token
+
+    def _get_response_token(self, response_text: str) -> str:
+        match = re.search('(data-next-page-token\s*=\s*")([\w=]*)', response_text)
+        if match:
+            return match.groups()[1]
+        self.logger.info("regex token not found")
+
+    def _get_request(
         self,
         feature_id: str,
         async_: str = "",
@@ -85,39 +153,13 @@ class GoogleMapsAPIScraper:
         response.raise_for_status()
 
         # Decode response
-        response_text = response.content.decode(encoding="unicode_escape")
-        if response_text is None or response_text == "":
-            raise Exception(
-                "Response text is none. Try request again."
-                f"Response: {response} Status: {response.status_code}"
-            )
+        response_text = self._decode_response(response)
 
         # Cut response to remove css
-        response_text = self._cut_response(response_text)
+        response_text = self._cut_response_text(response_text)
 
-        # Send page to soup and trees
-        response_soup = BeautifulSoup(response_text, "lxml")
-        tree = html.document_fromstring(response_text)
-        # soup = BeautifulSoup(response, "html.parser")
-        # dom = etree.HTML(response_soup.text)
-
-        # Encontrando número de reviews e token de próxima página
-        metadata_node = tree.xpath("//*[@data-google-review-count]")[0]
-        review_count = int(metadata_node.attrib["data-google-review-count"])
-        next_token = metadata_node.attrib["data-next-page-token"]
-
-        # Iterando sobre texto de cada review
-        reviews_tree = tree.xpath("/html/body/div[1]/div/div[2]/div[4]/div/div[2]/div")
-        reviews_soup = [response_soup.find("div", dict(r.attrib)) for r in reviews_tree]
-
-        return response, response_soup, reviews_soup, review_count, next_token
-
-    def _cut_response(self, text: str) -> str:
-        idx_first_div = text.find("<div ")
-        m = re.search("</div>", text, flags=re.REVERSE)
-        idx_last_div = m.span()[1]
-        text = text[idx_first_div:idx_last_div]
-        return "<html><body>" + text + "</body></html>"
+        # Format response into list of reviews
+        return self._format_response_text(response_text)
 
     def _parse_place(
         self,
@@ -184,26 +226,34 @@ class GoogleMapsAPIScraper:
         return text
 
     def _handle_review_exception(self, result, review, name) -> dict:
+        # Error log
         tb = re.sub("\s", " ", traceback.format_exc())
-        tb = f"review {name}:{tb}"
-        self.logger.error(tb)
+        msg = f"review {name}: {tb}"
+        self.logger.error(msg)
+        # Appending to line
         tb = re.sub("['\"]", " ", tb)
         result["errors"].append(tb)
-        ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f")
-        with open(f"examples/error_{name}_{ts}.html", "w", encoding="utf-8") as f:
+        # Saving file
+        with open(
+            f"errors/review_{name}_{self._ts()}.html", "w", encoding="utf-8"
+        ) as f:
             f.writelines(str(review))
+            f.writelines(msg)
         return result
 
-    def _handle_place_exception(self, review, name) -> dict:
+    def _handle_place_exception(self, response_text, name, n) -> dict:
+        # Error log
         tb = re.sub("\s", " ", traceback.format_exc())
-        tb = f"place {name}:{tb}"
-        self.logger.error(tb)
-        tb = re.sub("['\"]", " ", tb)
-        ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f")
-        with open(f"examples/error_{name}_{ts}.html", "w", encoding="utf-8") as f:
-            f.writelines(str(review))
+        msg = f"place {name} request {n}: {tb}"
+        self.logger.error(msg)
+        # Saving file
+        with open(
+            f"errors/place_{name}_request_{n}_{self._ts()}.html", "w", encoding="utf-8"
+        ) as f:
+            f.writelines(response_text)
+            f.writelines(msg)
 
-    def _parse_review(self, review: Tag):
+    def _parse_review(self, review: Tag) -> dict:
         result = review_default_result.copy()
 
         # Parse text
@@ -309,34 +359,6 @@ class GoogleMapsAPIScraper:
 
         return result
 
-    def _node_to_xpath(self, node):
-        node_type = {
-            Tag: getattr(node, "name"),
-            Comment: "comment()",
-            NavigableString: "text()",
-        }
-        same_type_siblings = list(
-            node.parent.find_all(
-                lambda x: getattr(node, "name", True) == getattr(x, "name", False),
-                recursive=False,
-            )
-        )
-        if len(same_type_siblings) <= 1:
-            return node_type[type(node)]
-        pos = same_type_siblings.index(node) + 1
-        return f"{node_type[type(node)]}[{pos}]"
-
-    def _get_node_xpath(self, node: Union[Tag, Comment]):
-        xpath = "/"
-        elements = [f"{self._node_to_xpath(node)}"]
-        for p in node.parents:
-            if p.name == "[document]":
-                break
-            elements.insert(0, self._node_to_xpath(p))
-
-        xpath = "/" + xpath.join(elements)
-        return xpath
-
     def scrape_reviews(
         self,
         url: str,
@@ -362,31 +384,43 @@ class GoogleMapsAPIScraper:
             self.logger.info(f"Request: {i:>8}; review: {j:>8}")
             n = self.n_retries
             while n > 0:
+                next_token = None
                 try:
-                    _, _, reviews_soup, review_count, token = self._get_api_response(
+                    (
+                        response_text,
+                        response_soup,
+                        reviews_soup,
+                        review_count,
+                        next_token,
+                    ) = self._get_request(
                         feature_id,
                         hl=hl,
                         sort_by_id=sort_by_id,
                         token=token,
                     )
+                    assert isinstance(reviews_soup, list)
                     break
                 except Exception as e:
                     n -= 1
-                    if n == 0:
-                        self._handle_place_exception(reviews_soup, url_name)
+                    self._handle_place_exception(response_text, url_name, i)
+                    if n == 0 and next_token is None:
                         self.logger.exception(
-                            f"Max retries exceeded."
-                            f"\nEnding scraping hotel: {url_name}"
+                            f"Max retries exceeded. Ending: {url_name}"
                             f"\nRequests made: {i+1}\nReviews parsed: {j}"
                         )
                         raise e
-                    tb = re.sub("\s", " ", traceback.format_exc())
-                    self.logger.info(
-                        f"error in hotel: {url_name} making request: {i}"
-                        f"exception: {e} tb: {tb}"
-                    )
-                    self.logger.info(f"waiting {self.retry_time} seconds")
-                    time.sleep(self.retry_time)
+                    elif n == 0:
+                        self.logger.exception(
+                            f"Max retries exceeded. Skipping token: {token} for hotel: {url_name}"
+                            f"\nRequests made: {i+1}\nReviews parsed: {j}"
+                        )
+                        break
+                    else:
+                        self.logger.info(f"waiting {self.retry_time} seconds")
+                        time.sleep(self.retry_time)
+            token = next_token
+            if n == 0:
+                continue
 
             try:
                 for review in reviews_soup:
@@ -402,10 +436,10 @@ class GoogleMapsAPIScraper:
                     j += 1
             except Exception as e:
                 tb = re.sub("\s", " ", traceback.format_exc())
-                self.logger.info(f"error parsing request: {i} exception: {e} tb: {tb}")
+                self.logger.info(f"error parsing review: {j} request: {i} tb: {tb}")
 
             if review_count < 10 or token == "":
-                self.logger.info(f"Place review limit at {j}")
+                self.logger.info(f"Place review limit at {j} reviews")
                 break
 
             # Waiting so google wont block this scraper
@@ -432,7 +466,7 @@ class GoogleMapsAPIScraper:
         feature_id = self._parse_url_to_feature_id(url)
 
         self.logger.info(f"Parsing metadata...")
-        _, response_soup, _, _, _ = self._get_api_response(
+        _, response_soup, _, _, _ = self._get_request(
             feature_id,
             hl=hl,
         )
