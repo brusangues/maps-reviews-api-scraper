@@ -122,6 +122,7 @@ class GoogleMapsAPIScraper:
         return response_text, response_soup, reviews_soup, review_count, next_token
 
     def _get_response_token(self, response_text: str) -> str:
+        """Searches for token in response text using regex, in case other methods fail"""
         match = re.search('(data-next-page-token\s*=\s*")([\w=]*)', response_text)
         if match:
             return match.groups()[1]
@@ -136,6 +137,7 @@ class GoogleMapsAPIScraper:
         associated_topic: str = "",
         token: str = "",
     ) -> Tuple[BeautifulSoup, List[BeautifulSoup], int, str]:
+        """Makes and formats get request in google's api"""
         if not hl:
             hl = self.hl
         query = (
@@ -165,6 +167,7 @@ class GoogleMapsAPIScraper:
         self,
         response: BeautifulSoup,
     ) -> dict:
+        """Parse place html"""
         metadata = metadata_default.copy()
 
         # Parse place_name
@@ -212,6 +215,7 @@ class GoogleMapsAPIScraper:
         return metadata
 
     def _parse_review_text(self, text_block) -> str:
+        """Parse review text html, removing unwanted characters"""
         text = ""
         for e, s in zip(text_block.contents, text_block.stripped_strings):
             if isinstance(e, Tag) and e.has_attr(
@@ -255,6 +259,9 @@ class GoogleMapsAPIScraper:
 
     def _parse_review(self, review: Tag) -> dict:
         result = review_default_result.copy()
+
+        # Make timestamp
+        result["retrieval_date"] = str(datetime.now())
 
         # Parse text
         try:
@@ -354,9 +361,6 @@ class GoogleMapsAPIScraper:
         except Exception as e:
             self._handle_review_exception(result, review, "trip_type_travel_group")
 
-        # Make timestamp
-        result["retrieval_date"] = str(datetime.now())
-
         return result
 
     def scrape_reviews(
@@ -369,6 +373,7 @@ class GoogleMapsAPIScraper:
         sort_by: str = "",
         token: str = "",
     ):
+        """Scrape specified amount of reviews of a place, appending results in csv"""
         url_name = re.findall("(?<=place/).*?(?=/)", url)[0]
         url_name = urllib.parse.unquote_plus(url_name)
         self.logger.info(f"Scraping url: {url_name}")
@@ -459,6 +464,7 @@ class GoogleMapsAPIScraper:
         name,
         hl: str = "",
     ):
+        """Scrape place metadata, writing to csv"""
         url_name = re.findall("(?<=place/).*?(?=/)", url)[0]
         url_name = urllib.parse.unquote_plus(url_name)
         self.logger.info(f"Scraping url: {url_name}")
