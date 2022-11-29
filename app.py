@@ -9,7 +9,7 @@ import traceback
 
 from src.scraper import GoogleMapsAPIScraper
 from src.config import review_default_result, metadata_default
-from src.customlogger import get_logger
+from src.custom_logger import get_logger
 
 app = typer.Typer()
 logger = get_logger("google_maps_api_scraper")
@@ -21,32 +21,33 @@ places_path = "data/places.csv"
 
 @app.command()
 def run(path: str = file_path):
-    print("Running sync")
-    df = pd.read_csv(path, sep=",", encoding="utf-8")
-    df = df.loc[df.done == 0]
-    results = []
-    for row in df.to_dict(orient="records"):
-        result = call_scraper(**row)
-        results.append(result)
-    print("Finished running scraper sync")
-    for (rs, m) in results:
-        print(
-            f"name:{m['name']:<16.16}; "
-            f"place_name:{m['place_name']:<16.16}; "
-            f"n_reviews_max:{m['n_reviews']:>6}; "
-            f"n_reviews_scraped:{len(rs):>6}; "
-            f"n_errors:{len([e for r in rs for es in r['errors'] for e in es])}"
-        )
+    df_list = load_input(path)
+    results = call_sequential(df_list)
+    log_summary(results, df_list)
 
 
 @app.command()
 def run_async(path: str = file_path):
-    print("Running async")
-    df = pd.read_csv(path, sep=",", encoding="utf-8")
-    df = df.loc[df.done == 0]
+    df_list = load_input(path)
+    results = call_pools(df_list)
+    log_summary(results, df_list)
+
+
+def call_sequential(df_list: list) -> list:
+    logger.info("Running sync")
+    results = []
+    for row in df_list:
+        result = call_scraper(**row)
+        results.append(result)
+    logger.info("Finished running scraper sync")
+    return results
+
+
+def call_pools(df_list: list) -> list:
+    logger.info("Running async")
     results = []
     with Pool(processes=n_processes) as pool:
-        for row in df.to_dict(orient="records"):
+        for row in df_list:
             p = pool.apply_async(
                 func=call_scraper,
                 kwds=row,
@@ -54,13 +55,25 @@ def run_async(path: str = file_path):
             results.append(p)
         [p.wait() for p in results]
         results = [p.get() for p in results]
-    print("Finished running scraper async")
-    for (rs, m) in results:
-        print(
+    logger.info("Finished running scraper async")
+    return results
+
+
+def load_input(path: str):
+    df = pd.read_csv(path, sep=",", encoding="utf-8")
+    df = df.loc[df.done == 0]
+    df_list = df.to_dict(orient="records")
+    return df_list
+
+
+def log_summary(results: list, df_list: list):
+    for ((rs, m), row) in zip(results, df_list):
+        logger.info(
             f"name:{m['name']:<16.16}; "
             f"place_name:{m['place_name']:<16.16}; "
-            f"n_reviews_max:{m['n_reviews']:>6}; "
-            f"n_reviews_scraped:{len(rs):>6}; "
+            f"reviews_input:{row['n_reviews']:>6}; "
+            f"reviews_max:{m['n_reviews']:>6}; "
+            f"reviews_scraped:{len(rs):>6}; "
             f"n_errors:{len([e for r in rs for es in r['errors'] for e in es])}"
         )
 
@@ -69,7 +82,7 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
     # Create date folder
     path = datetime.now().strftime("data/%Y/%m/%d/")
     Path(path).mkdir(exist_ok=True, parents=True)
-    print("folder created")
+    logger.info("folder created")
 
     # Make filename
     file_name = str(name).strip().lower().replace(" ", "-")
@@ -104,15 +117,15 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
     with open(path + reviews_file_name, "a+", encoding="utf-8", newline="\n") as file:
         writer = csv.writer(file, quoting=csv.QUOTE_NONNUMERIC)
         writer.writerow(review_default_result.keys())
-        print("header written")
+        logger.info("header written")
 
         try:
             reviews = scraper.scrape_reviews(
                 url, writer, file, n_reviews, sort_by=sort_by
             )
         except Exception as e:
-            print(traceback.print_exc())
-            raise e
+            logger.exception("Error in scraper.scrape_reviews")
+            raise
 
     return reviews, metadata
 

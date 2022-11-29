@@ -10,7 +10,7 @@ from lxml import etree, html
 from bs4 import BeautifulSoup, Tag, NavigableString, Comment
 import regex as re
 
-from src.customlogger import get_logger
+from src.custom_logger import get_logger, CustomFilter
 from src.config import sort_by_enum, review_default_result, metadata_default
 
 default_hl = "pt-br"
@@ -376,7 +376,7 @@ class GoogleMapsAPIScraper:
         """Scrape specified amount of reviews of a place, appending results in csv"""
         url_name = re.findall("(?<=place/).*?(?=/)", url)[0]
         url_name = urllib.parse.unquote_plus(url_name)
-        self.logger.info(f"Scraping url: {url_name}")
+        self.logger.info(f"Scraping reviews for url: {url_name}")
 
         feature_id = self._parse_url_to_feature_id(url)
         sort_by_id = self._parse_sort_by(sort_by)
@@ -386,7 +386,7 @@ class GoogleMapsAPIScraper:
 
         n_requests = math.ceil((n_reviews) / 10)
         for i in range(n_requests):
-            self.logger.info(f"{url_name}; Request: {i:>8}; review: {j:>8}")
+            self.logger.info(f"Request: {i:>8}; review: {j:>8}")
             n = self.n_retries
             while n > 0:
                 next_token = None
@@ -410,14 +410,14 @@ class GoogleMapsAPIScraper:
                     self._handle_place_exception(response_text, url_name, i)
                     if n == 0 and next_token is None:
                         self.logger.exception(
-                            f"Max retries exceeded. Ending: {url_name}"
-                            f"\nRequests made: {i+1}\nReviews parsed: {j}"
+                            f"Max retries exceeded. Ending. "
+                            f"Requests made: {i+1}; Reviews parsed: {j}"
                         )
                         raise e
                     elif n == 0:
                         self.logger.exception(
-                            f"Max retries exceeded. Skipping token: {token} for hotel: {url_name}"
-                            f"\nRequests made: {i+1}\nReviews parsed: {j}"
+                            f"Max retries exceeded. Skipping token: {token}. "
+                            f"Requests made: {i+1}; Reviews parsed: {j}"
                         )
                         break
                     else:
@@ -451,7 +451,7 @@ class GoogleMapsAPIScraper:
             time.sleep(self.request_interval)
 
         self.logger.info(
-            f"Done Scraping Reviews\nRequests made: {i+1}\nReviews parsed: {j}"
+            f"Done Scraping Reviews. Requests made: {i+1}; Reviews parsed: {j}"
         )
 
         return results
@@ -467,7 +467,8 @@ class GoogleMapsAPIScraper:
         """Scrape place metadata, writing to csv"""
         url_name = re.findall("(?<=place/).*?(?=/)", url)[0]
         url_name = urllib.parse.unquote_plus(url_name)
-        self.logger.info(f"Scraping url: {url_name}")
+        self.logger.addFilter(CustomFilter(url_name))
+        self.logger.info(f"Scraping metadata for url: {url_name}")
 
         feature_id = self._parse_url_to_feature_id(url)
 
