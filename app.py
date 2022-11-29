@@ -24,8 +24,19 @@ def run(path: str = file_path):
     print("Running sync")
     df = pd.read_csv(path, sep=",", encoding="utf-8")
     df = df.loc[df.done == 0]
+    results = []
     for row in df.to_dict(orient="records"):
-        call_scraper(**row)
+        result = call_scraper(**row)
+        results.append(result)
+    print("Finished running scraper sync")
+    for (rs, m) in results:
+        print(
+            f"name:{m['name']:<16.16}; "
+            f"place_name:{m['place_name']:<16.16}; "
+            f"n_reviews_max:{m['n_reviews']:>6}; "
+            f"n_reviews_scraped:{len(rs):>6}; "
+            f"n_errors:{len([e for r in rs for es in r['errors'] for e in es])}"
+        )
 
 
 @app.command()
@@ -36,12 +47,22 @@ def run_async(path: str = file_path):
     results = []
     with Pool(processes=n_processes) as pool:
         for row in df.to_dict(orient="records"):
-            result = pool.apply_async(
+            p = pool.apply_async(
                 func=call_scraper,
                 kwds=row,
             )
-            results.append(result)
-        [result.wait() for result in results]
+            results.append(p)
+        [p.wait() for p in results]
+        results = [p.get() for p in results]
+    print("Finished running scraper async")
+    for (rs, m) in results:
+        print(
+            f"name:{m['name']:<16.16}; "
+            f"place_name:{m['place_name']:<16.16}; "
+            f"n_reviews_max:{m['n_reviews']:>6}; "
+            f"n_reviews_scraped:{len(rs):>6}; "
+            f"n_errors:{len([e for r in rs for es in r['errors'] for e in es])}"
+        )
 
 
 def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **kwargs):
@@ -86,10 +107,14 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
         print("header written")
 
         try:
-            scraper.scrape_reviews(url, writer, file, n_reviews, sort_by=sort_by)
+            reviews = scraper.scrape_reviews(
+                url, writer, file, n_reviews, sort_by=sort_by
+            )
         except Exception as e:
             print(traceback.print_exc())
             raise e
+
+    return reviews, metadata
 
 
 if __name__ == "__main__":

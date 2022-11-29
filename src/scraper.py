@@ -386,7 +386,7 @@ class GoogleMapsAPIScraper:
 
         n_requests = math.ceil((n_reviews) / 10)
         for i in range(n_requests):
-            self.logger.info(f"Request: {i:>8}; review: {j:>8}")
+            self.logger.info(f"{url_name}; Request: {i:>8}; review: {j:>8}")
             n = self.n_retries
             while n > 0:
                 next_token = None

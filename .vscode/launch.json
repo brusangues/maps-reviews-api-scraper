@@ -25,7 +25,7 @@
             "args": [
                 "run",
                 "--path",
-                "input/hotels.csv"
+                "input/test.csv"
             ],
             "env": {
                 "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "30"
@@ -41,7 +41,7 @@
             "args": [
                 "run-async",
                 "--path",
-                "input/hotels.csv"
+                "input/test.csv"
             ],
             "env": {
                 "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "30"
