@@ -5,7 +5,6 @@ import json
 from multiprocessing import Pool
 import pandas as pd
 import typer
-import traceback
 
 from src.scraper import GoogleMapsAPIScraper
 from src.config import review_default_result, metadata_default
@@ -71,9 +70,9 @@ def log_summary(results: list, df_list: list):
         logger.info(
             f"name:{m['name']:<16.16}; "
             f"place_name:{m['place_name']:<16.16}; "
-            f"reviews_input:{row['n_reviews']:>6}; "
-            f"reviews_max:{m['n_reviews']:>6}; "
-            f"reviews_scraped:{len(rs):>6}; "
+            f"n_max:{m['n_reviews']:>6}; "
+            f"n_input:{row['n_reviews']:>6}; "
+            f"n_scraped:{len(rs):>6}; "
             f"n_errors:{len([e for r in rs for es in r['errors'] for e in es])}"
         )
 
@@ -94,38 +93,39 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
     #     pass
 
     # Create scraper object
-    scraper = GoogleMapsAPIScraper(hl=hl, logger=logger)
+    with GoogleMapsAPIScraper(hl=hl, logger=logger) as scraper:
+        # Create csv writer for metadata
+        write_places_header = not Path(places_path).exists()
+        with open(places_path, "a+", encoding="utf-8", newline="\n") as file:
+            writer = csv.writer(file, quoting=csv.QUOTE_NONNUMERIC)
+            if write_places_header:
+                writer.writerow(metadata_default.keys())
 
-    # Create csv writer for metadata
-    write_places_header = not Path(places_path).exists()
-    with open(places_path, "a+", encoding="utf-8", newline="\n") as file:
-        writer = csv.writer(file, quoting=csv.QUOTE_NONNUMERIC)
-        if write_places_header:
-            writer.writerow(metadata_default.keys())
+            metadata = scraper.scrape_place(url, writer, file, name)
 
-        metadata = scraper.scrape_place(url, writer, file, name)
+        # Create json for metadata
+        with open(path + place_file_name, "w", encoding="latin1") as f:
+            json.dump(metadata, f, indent=4)
 
-    # Create json for metadata
-    with open(path + place_file_name, "w", encoding="latin1") as f:
-        json.dump(metadata, f, indent=4)
+        # Changes negative n_reviews
+        if n_reviews < 0:
+            n_reviews = metadata["n_reviews"]
 
-    # Changes n_reviews
-    if n_reviews < 0:
-        n_reviews = metadata["n_reviews"]
+        # Create csv writer and start scraping
+        with open(
+            path + reviews_file_name, "a+", encoding="utf-8", newline="\n"
+        ) as file:
+            writer = csv.writer(file, quoting=csv.QUOTE_NONNUMERIC)
+            writer.writerow(review_default_result.keys())
+            logger.info("header written")
 
-    # Create csv writer and start scraping
-    with open(path + reviews_file_name, "a+", encoding="utf-8", newline="\n") as file:
-        writer = csv.writer(file, quoting=csv.QUOTE_NONNUMERIC)
-        writer.writerow(review_default_result.keys())
-        logger.info("header written")
-
-        try:
-            reviews = scraper.scrape_reviews(
-                url, writer, file, n_reviews, sort_by=sort_by
-            )
-        except Exception as e:
-            logger.exception("Error in scraper.scrape_reviews")
-            raise
+            try:
+                reviews = scraper.scrape_reviews(
+                    url, writer, file, n_reviews, sort_by=sort_by
+                )
+            except Exception as e:
+                logger.exception("Error in scraper.scrape_reviews")
+                raise
 
     return reviews, metadata
 

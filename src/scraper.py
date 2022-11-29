@@ -14,7 +14,7 @@ from src.custom_logger import get_logger, CustomFilter
 from src.config import sort_by_enum, review_default_result, metadata_default
 
 default_hl = "pt-br"
-default_request_interval = 0.5
+default_request_interval = 0.2
 default_n_retries = 10
 default_retry_time = 30
 
@@ -39,16 +39,22 @@ class GoogleMapsAPIScraper:
         self.request_interval = request_interval
         self.n_retries = n_retries
         self.retry_time = retry_time
+        self._reset_logger_filter()
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
+        self._reset_logger_filter()
         if exc_type is not None:
             traceback.print_exception(exc_type, exc_value, tb)
             self.logger.exception(exc_value)
 
         return True
+
+    def _reset_logger_filter(self, url_name=""):
+        [self.logger.removeFilter(f) for f in self.logger.filters]
+        self.logger.addFilter(CustomFilter(url_name))
 
     def _ts(self) -> str:
         """Returns timestamp formatted as string safe for file naming"""
@@ -376,6 +382,7 @@ class GoogleMapsAPIScraper:
         """Scrape specified amount of reviews of a place, appending results in csv"""
         url_name = re.findall("(?<=place/).*?(?=/)", url)[0]
         url_name = urllib.parse.unquote_plus(url_name)
+        self._reset_logger_filter(url_name)
         self.logger.info(f"Scraping reviews for url: {url_name}")
 
         feature_id = self._parse_url_to_feature_id(url)
@@ -467,7 +474,7 @@ class GoogleMapsAPIScraper:
         """Scrape place metadata, writing to csv"""
         url_name = re.findall("(?<=place/).*?(?=/)", url)[0]
         url_name = urllib.parse.unquote_plus(url_name)
-        self.logger.addFilter(CustomFilter(url_name))
+        self._reset_logger_filter(url_name)
         self.logger.info(f"Scraping metadata for url: {url_name}")
 
         feature_id = self._parse_url_to_feature_id(url)

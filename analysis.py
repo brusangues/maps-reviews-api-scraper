@@ -6,9 +6,14 @@ from datetime import datetime
 import regex as re
 from unidecode import unidecode
 from dateutils import relativedelta
+import typer
 
+from src.custom_logger import get_logger
 from src.analysis_config import *
 from src.analysis_preprocessing import map_progress, tokenizer_lemma
+
+app = typer.Typer()
+logger = get_logger("google_maps_api_scraper")
 
 # Removendo aviso de debug
 os.environ["PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT"] = "3000"
