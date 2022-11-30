@@ -247,8 +247,7 @@ class GoogleMapsAPIScraper:
         with open(
             f"errors/review_{name}_{self._ts()}.html", "w", encoding="utf-8"
         ) as f:
-            f.writelines(str(review))
-            f.writelines(msg)
+            f.writelines(str(review) + "\n\n" + msg)
         return result
 
     def _handle_place_exception(self, response_text, name, n) -> dict:
@@ -260,8 +259,7 @@ class GoogleMapsAPIScraper:
         with open(
             f"errors/place_{name}_request_{n}_{self._ts()}.html", "w", encoding="utf-8"
         ) as f:
-            f.writelines(response_text)
-            f.writelines(msg)
+            f.writelines(str(response_text) + "\n\n" + msg)
 
     def _parse_review(self, review: Tag) -> dict:
         result = review_default_result.copy()
