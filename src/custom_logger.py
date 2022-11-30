@@ -4,7 +4,7 @@ from pathlib import Path
 
 class CustomFilter(logging.Filter):
     def __init__(self, url_name=""):
-        self.url_name = url_name
+        self.url_name = url_name[:16].ljust(16) + " " if url_name != "" else ""
 
     def filter(self, record):
         if (not hasattr(record, "url_name")) or record.url_name == "":
@@ -18,7 +18,7 @@ class CustomFormatter(logging.Formatter):
     red = "\x1b[31;20m"
     bold_red = "\x1b[31;1m"
     reset = "\x1b[0m"
-    format = "%(asctime)s %(levelname)s %(process)6d [%(funcName)14s] (%(filename)s:%(lineno)3d): %(url_name)-16.16s - %(message)s"
+    format = "%(asctime)s %(levelname)s %(process)6d [%(funcName)14s] (%(filename)s:%(lineno)3d): %(url_name)s- %(message)s"
 
     FORMATS = {
         logging.DEBUG: grey + format + reset,
