@@ -125,6 +125,7 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
                 )
             except Exception as e:
                 logger.exception("Error in scraper.scrape_reviews")
+                reviews = []
                 raise
 
     return reviews, metadata

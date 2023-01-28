@@ -34,8 +34,10 @@ class CustomFormatter(logging.Formatter):
         return formatter.format(record)
 
 
-def get_logger(logger_name="logger", url_name=""):
-    logger = logging.getLogger(logger_name)
+def get_logger(logger_name="logger", url_name="", logger=None):
+    if logger is None:
+        logger = logging.getLogger(logger_name)
+    logger.name = logger_name
     logger.setLevel(logging.DEBUG)
 
     Path("logs/").mkdir(exist_ok=True)

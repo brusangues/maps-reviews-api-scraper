@@ -1,16 +1,16 @@
+import string
+
 import nltk
+from nltk.corpus import stopwords
+from nltk.stem.porter import PorterStemmer
+from nltk.stem.wordnet import WordNetLemmatizer
+from nltk.tokenize import wordpunct_tokenize
+from tqdm import tqdm
 
 # nltk.download("punkt")
 # nltk.download("stopwords")
 # nltk.download("wordnet")
 
-from nltk.tokenize import wordpunct_tokenize
-from nltk.corpus import stopwords
-from nltk.stem.porter import PorterStemmer
-from nltk.stem.wordnet import WordNetLemmatizer
-
-import string
-from tqdm import tqdm
 
 stopwords = stopwords.words("portuguese")
 stm = PorterStemmer()

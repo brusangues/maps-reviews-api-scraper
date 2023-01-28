@@ -1,3 +1,9 @@
+from datetime import datetime
+
+# Time stamp
+ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f")
+
+
 input_cols = [
     "name",
     "sort_by",
