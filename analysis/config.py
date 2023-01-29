@@ -26,9 +26,9 @@ agg_dict = {
     "region": "first",
     "stars": "first",
     # "feature_id": "first",
-    # "retrieval_date_metadata": "first",
+    "retrieval_date_metadata": "first",
     # "place_name": "first",
-    # "address": "first",
+    "address": "first",
     "overall_rating": "first",
     "n_reviews": "first",
     # "topics": "first",
@@ -50,6 +50,17 @@ agg_dict = {
     "text": "count",
     "response_text": "count",
     "response_relative_date": "count",
+}
+
+text_agg_dict = {
+    # Input
+    "place_name": "first",
+    # Review
+    "review_id":"count",
+    "text": "count",
+    "response_text": "count",
+    "words_len": "sum",
+    "tokens_len": "sum",
 }
 
 feature_cols = [
