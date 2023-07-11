@@ -26,6 +26,7 @@ def save_df(df, folder, name):
     if df.empty:
         return
     file_path = f"{folder}/{name}_{ts}.pq"
+    print(file_path)
     return df.to_parquet(file_path, engine="pyarrow")
 
 
@@ -49,7 +50,7 @@ def parse_relative_date(relative_date, retrieval_date, hl="pt-br"):
 
 def parse_translated_text(text, hl="pt-br"):
     if not isinstance(text, str):
-        return False, None
+        return None, None
     is_other_language = translated_text_maps[hl]["flag"] in text
     if is_other_language:
         text = re.sub(translated_text_maps[hl]["regex"], "", text)

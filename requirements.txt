@@ -8,3 +8,4 @@ openpyxl
 pyarrow
 unidecode
 dateutils
+plotly

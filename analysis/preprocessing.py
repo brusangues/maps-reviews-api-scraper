@@ -17,7 +17,7 @@ stm = PorterStemmer()
 wnl = WordNetLemmatizer()
 
 
-def custom_tokenizer(text, reduc="stemmer", min_len=4, stopwords=stopwords):
+def custom_tokenizer(text, reduc="stemmer", min_len=3, stopwords=stopwords):
     text = str(text)
     words = wordpunct_tokenize(text)
     # Removendo pontuação e tornando lowercase
@@ -35,11 +35,11 @@ def custom_tokenizer(text, reduc="stemmer", min_len=4, stopwords=stopwords):
 
 
 # Funções separadas serão úteis posteriormente
-def tokenizer_lemma(text, min_len=4):
+def tokenizer_lemma(text, min_len=3):
     return custom_tokenizer(text, reduc="lemmatizer", min_len=min_len)
 
 
-def tokenizer_stem(text, min_len=4):
+def tokenizer_stem(text, min_len=3):
     return custom_tokenizer(text, reduc="stemmer", min_len=min_len)
 
 
