@@ -10,7 +10,7 @@ import typer
 from dateutils import relativedelta
 from unidecode import unidecode
 
-from analysis.config import *
+from analysis.src.config import *
 
 
 def make_report(df, reports_folder, name):

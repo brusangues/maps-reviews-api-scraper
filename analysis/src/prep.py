@@ -11,8 +11,8 @@ from dateutils import relativedelta
 from unidecode import unidecode
 from tqdm import tqdm
 
-from analysis.config import *
-from analysis.preprocessing import map_progress, tokenizer_lemma
+from analysis.src.config import *
+from analysis.src.preprocessing import map_progress, tokenizer_lemma
 
 tqdm.pandas()
 
@@ -53,7 +53,9 @@ def read_data(input_file: str, data_path: str) -> pd.DataFrame:
     return df_merge
 
 
-def prep_complete(df_merge: pd.DataFrame):
+def prep_complete(
+    df_merge: pd.DataFrame, lat_long_path: str = "analysis/artifacts/lat_long.csv"
+):
     print("drop duplicates")
     df = df_merge.copy()
     df = df.drop_duplicates(subset="review_id").reset_index(drop=True)
@@ -67,7 +69,7 @@ def prep_complete(df_merge: pd.DataFrame):
     )
 
     print("lattitude and longitude")
-    lat_long = pd.read_csv("data/lat_long.csv")
+    lat_long = pd.read_csv(lat_long_path)
     df = df.merge(lat_long, on="name", how="inner", validate="many_to_one")
 
     print("relative dates")
