@@ -1,11 +1,11 @@
-data/**/*.csv
-data/**/*.pq
-data/**/*.parquet
-data/**/*.json
-data/**.parquet
+scrapper/data/**/*.csv
+scrapper/data/**/*.pq
+scrapper/data/**/*.parquet
+scrapper/data/**/*.json
+scrapper/data/**.parquet
 __pycache__
-errors/
-reports/
+scrapper/errors/
+scrapper/reports/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
