@@ -176,18 +176,21 @@ class GoogleMapsAPIScraper:
         """Parse place html"""
         metadata = metadata_default.copy()
 
-        # Parse place_name
-        try:
-            metadata["place_name"] = response.find(True, class_="P5Bobd").text
-        except Exception as e:
-            self.logger.error("error parsing place: place_name")
-            self.logger.exception(e)
-
         # Parse address
         try:
-            metadata["address"] = response.find(True, class_="T6pBCe").text
+            metadata["address"] = response.find(True, class_="ffUfxe").text
         except Exception as e:
             self.logger.error("error parsing place: address")
+            self.logger.exception(e)
+
+        # Parse place_name
+        try:
+            # pegar texto da primeira div apenas, ou excluir texto do endereço
+            place_name = response.find(True, class_="Lhccdd").text
+            place_name = place_name.replace(metadata["address"], "")
+            metadata["place_name"] = place_name
+        except Exception as e:
+            self.logger.error("error parsing place: place_name")
             self.logger.exception(e)
 
         # Parse overall_rating
@@ -208,13 +211,13 @@ class GoogleMapsAPIScraper:
             self.logger.exception(e)
 
         # Parse topics
-        try:
-            topics = response.find("localreviews-place-topics")
-            s = " ".join([s for s in topics.stripped_strings])
-            metadata["topics"] = re.sub("\s+", " ", s)
-        except Exception as e:
-            self.logger.error("error parsing place: topics")
-            self.logger.exception(e)
+        # try:
+        #     topics = response.find("localreviews-place-topics")
+        #     s = " ".join([s for s in topics.stripped_strings])
+        #     metadata["topics"] = re.sub("\s+", " ", s)
+        # except Exception as e:
+        #     self.logger.error("error parsing place: topics")
+        #     self.logger.exception(e)
 
         metadata["retrieval_date"] = str(datetime.now())
 
@@ -279,9 +282,9 @@ class GoogleMapsAPIScraper:
         except Exception as e:
             self._handle_review_exception(result, review, "text")
 
-        # Parse review rating
+        # Parse review rating OK
         try:
-            rating_text = review.find(True, class_="Fam1ne EBe2gf").get("aria-label")
+            rating_text = review.find(True, class_="lTi8oc z3HNkc").get("aria-label")
             rating_text = re.sub(",", ".", rating_text)
             rating = re.findall("[0-9]+[.][0-9]*", rating_text)
             result["rating"] = float(rating[0])
@@ -304,7 +307,7 @@ class GoogleMapsAPIScraper:
         except Exception as e:
             self._handle_review_exception(result, review, "relative_date")
 
-        # Parse user name
+        # Parse user name OK
         try:
             result["user_name"] = review.find(True, class_="TSUbDb").text
         except Exception as e:
@@ -329,7 +332,7 @@ class GoogleMapsAPIScraper:
         except Exception as e:
             self._handle_review_exception(result, review, "user_data")
 
-        # Parse review id
+        # Parse review id OK
         try:
             # result["review_id"] = review.find(True, {"data-ri": True}).get("data-ri")
             review_id = review.find(True, class_="RvU3D").get("href")
@@ -337,7 +340,7 @@ class GoogleMapsAPIScraper:
         except Exception as e:
             self._handle_review_exception(result, review, "review_id")
 
-        # Parse review likes
+        # Parse review likes OK
         try:
             review_likes = review.find(True, jsname="CMh1ye")
             if review_likes:

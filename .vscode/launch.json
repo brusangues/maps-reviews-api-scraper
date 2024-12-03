@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Analisys",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
@@ -17,11 +17,12 @@
         },
         {
             "name": "run",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "console": "integratedTerminal",
             "justMyCode": true,
             "module": "app",
+            "cwd": "${cwd}/scraper",
             "args": [
                 "run",
                 "--path",
@@ -33,7 +34,7 @@
         },
         {
             "name": "run-async",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "console": "integratedTerminal",
             "justMyCode": true,

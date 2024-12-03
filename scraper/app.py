@@ -66,7 +66,7 @@ def load_input(path: str):
 
 
 def log_summary(results: list, df_list: list):
-    for ((rs, m), row) in zip(results, df_list):
+    for (rs, m), row in zip(results, df_list):
         logger.info(
             f"name:{m['name']:<16.16}; "
             f"place_name:{m['place_name']:<16.16}; "
@@ -96,6 +96,7 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
     with GoogleMapsAPIScraper(hl=hl, logger=logger) as scraper:
         # Create csv writer for metadata
         write_places_header = not Path(places_path).exists()
+        metadata = {}
         with open(places_path, "a+", encoding="utf-8", newline="\n") as file:
             writer = csv.writer(file, quoting=csv.QUOTE_NONNUMERIC)
             if write_places_header:
@@ -112,6 +113,7 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
             n_reviews = metadata["n_reviews"]
 
         # Create csv writer and start scraping
+        reviews = []
         with open(
             path + reviews_file_name, "a+", encoding="utf-8", newline="\n"
         ) as file:
@@ -125,7 +127,6 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
                 )
             except Exception as e:
                 logger.exception("Error in scraper.scrape_reviews")
-                reviews = []
                 raise
 
     return reviews, metadata
