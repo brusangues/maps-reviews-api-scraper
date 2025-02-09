@@ -1,0 +1,11 @@
+pandas 
+beautifulsoup4
+lxml
+regex
+requests
+typer
+openpyxl
+pyarrow
+unidecode
+dateutils
+plotly

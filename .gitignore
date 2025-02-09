@@ -1,11 +1,11 @@
-data/**/*.csv
-data/**/*.pq
-data/**/*.parquet
-data/**/*.json
-data/**.parquet
-__pycache__
-errors/
-reports/
+*data/**/*.csv
+*data/**/*.pq
+*data/**/*.parquet
+*data/**/*.json
+*data/**/.parquet
+scrapper/errors/
+scrapper/reports/
+.vscode/settings.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
