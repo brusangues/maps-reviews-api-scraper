@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -95,3 +96,14 @@ def read_data(input_file: str, data_path: str) -> pd.DataFrame:
     logging.info(df)
     df.info()
     return df
+
+
+def timeit(method):
+    def timed(*args, **kw):
+        ts = time.time()
+        result = method(*args, **kw)
+        te = time.time()
+        logging.info(f"{method.__name__} took: {te - ts}")
+        return result
+
+    return timed

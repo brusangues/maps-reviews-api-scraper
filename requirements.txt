@@ -1,0 +1,23 @@
+jupyter
+langchain
+langchain-community
+langchain-text-splitters
+langchain-huggingface
+langgraph
+huggingface_hub[cli]
+transformers >= 4.43.0
+pandas
+numpy
+faiss-cpu
+pyarrow
+typer
+dateutils
+unidecode
+bitsandbytes
+torch
+accelerate
+tqdm
+
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+# IMAGE: diffusers protobuf sentencepiece
