@@ -1,12 +1,20 @@
-# pip install python-telegram-bot
+"""
+start - inicializar o ambiente
+reset - reiniciar o ambiente
+echo - retorna a mensagem do usuário
+help - ajuda
+load - carrega um modelo de linguagem
+rag - carrega modelo de embedding e índice de busca semântica
+filter - configura um filtro para o índice de busca semântica
+"""
 
+# pip install python-telegram-bot
 import os
 import traceback
 from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
-    CallbackContext,
     MessageHandler,
     filters,
     ContextTypes,
@@ -14,8 +22,15 @@ from telegram.ext import (
 import torch
 import json
 
-from llms.models import load_model, load_embedding, query_model_async
-from llms.rag import load_index, query_index, PROMPT
+from llms.models import (
+    load_model,
+    load_embedding,
+    query_model,
+    query_model_async,
+    models_text,
+    models_embedding,
+)
+from llms.rag import load_index, query_index, query_make_filter, PROMPT
 
 
 LLM = None
@@ -28,11 +43,32 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global LLM, INDEX, FILTER
     del LLM, INDEX, FILTER
     torch.cuda.empty_cache()
+    LLM, _, _ = load_model("gemini-1.5-flash")
+    embedding, _ = load_embedding()
+    INDEX = load_index(embedding)
+    FILTER = {}
+    print("\nstart_command")
+    await update.message.reply_text("Oi, eu sou um bot. Ambiente inicializado!")
+
+
+async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global LLM, INDEX, FILTER
+    del LLM, INDEX, FILTER
+    torch.cuda.empty_cache()
     LLM = None
     INDEX = None
     FILTER = {}
-    print("\nstart_command")
-    await update.message.reply_text("Oi, eu sou um bot!")
+    print("\nreset_command")
+    await update.message.reply_text("Ambiente reiniciado!")
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("\nhelp_command")
+    await update.message.reply_text(
+        f"Modelos de linguagem disponíveis:\n{models_text}\n"
+        f"Modelos de embedding disponíveis:\n{models_embedding}\n"
+        f"Comandos disponíveis: start, echo, load, rag ,filter, help"
+    )
 
 
 async def echo_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -47,8 +83,10 @@ async def load_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print("\nload_command")
     args = update.message.text.replace("/load", "").strip().split()
     print(f"{args=}")
-    LLM, model_name = load_model(*args)
-    await update.message.reply_text(f"Modelo carregado: {model_name}")
+    LLM, model_name, max_new_tokens = load_model(*args)
+    await update.message.reply_text(
+        f"Modelo carregado: {model_name}\nCom máximo de tokens: {max_new_tokens}"
+    )
 
 
 async def rag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -88,16 +126,26 @@ async def handle_response(update: Update, text: str) -> str:
     global LLM, FILTER, INDEX
     if "oi" == text.lower():
         return "Oi de novo, eu sou um bot!"
-    elif LLM is not None and INDEX is not None:
-        results, context = query_index(INDEX, text, FILTER)
-        await update.message.reply_text(context)
+    elif LLM is not None and INDEX is not None and len(FILTER.keys()) == 0:
+        filter = query_make_filter(LLM, text)
+        await update.message.reply_text(f"Filtro criado dinamicamente: {filter}")
+        results, context = query_index(INDEX, text, filter)
+        await update.message.reply_text(f"Resultado da busca no índice:\n{context}")
         prompt = PROMPT.format(
             context=context,
             question=text,
         )
-        return await query_model_async(LLM, prompt)
+        return query_model(LLM, prompt)
+    elif LLM is not None and INDEX is not None:
+        results, context = query_index(INDEX, text, FILTER)
+        await update.message.reply_text(f"Resultado da busca no índice:\n{context}")
+        prompt = PROMPT.format(
+            context=context,
+            question=text,
+        )
+        return query_model(LLM, prompt)
     elif LLM is not None:
-        return await query_model_async(LLM, text)
+        return query_model(LLM, text)
     return (
         "Nenhum modelo está carregado. "
         "Use o comando /load para carregar um modelo de linguagem. "
@@ -142,6 +190,8 @@ if __name__ == "__main__":
 
     # Commands
     app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("reset", reset_command))
+    app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("echo", echo_command))
     app.add_handler(CommandHandler("load", load_command))
     app.add_handler(CommandHandler("rag", rag_command))
