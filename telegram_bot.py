@@ -1,5 +1,6 @@
 """
-start - reiniciar ambiente
+start - inicializar o ambiente
+reset - reiniciar o ambiente
 echo - retorna a mensagem do usuário
 help - ajuda
 load - carrega um modelo de linguagem
@@ -29,7 +30,7 @@ from llms.models import (
     models_text,
     models_embedding,
 )
-from llms.rag import load_index, query_index, PROMPT
+from llms.rag import load_index, query_index, query_make_filter, PROMPT
 
 
 LLM = None
@@ -42,11 +43,23 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global LLM, INDEX, FILTER
     del LLM, INDEX, FILTER
     torch.cuda.empty_cache()
+    LLM, _, _ = load_model("gemini-1.5-flash")
+    embedding, _ = load_embedding()
+    INDEX = load_index(embedding)
+    FILTER = {}
+    print("\nstart_command")
+    await update.message.reply_text("Oi, eu sou um bot. Ambiente inicializado!")
+
+
+async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global LLM, INDEX, FILTER
+    del LLM, INDEX, FILTER
+    torch.cuda.empty_cache()
     LLM = None
     INDEX = None
     FILTER = {}
-    print("\nstart_command")
-    await update.message.reply_text("Oi, eu sou um bot!")
+    print("\nreset_command")
+    await update.message.reply_text("Ambiente reiniciado!")
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -113,9 +126,19 @@ async def handle_response(update: Update, text: str) -> str:
     global LLM, FILTER, INDEX
     if "oi" == text.lower():
         return "Oi de novo, eu sou um bot!"
+    elif LLM is not None and INDEX is not None and len(FILTER.keys()) == 0:
+        filter = query_make_filter(LLM, text)
+        await update.message.reply_text(f"Filtro criado dinamicamente: {filter}")
+        results, context = query_index(INDEX, text, filter)
+        await update.message.reply_text(f"Resultado da busca no índice:\n{context}")
+        prompt = PROMPT.format(
+            context=context,
+            question=text,
+        )
+        return query_model(LLM, prompt)
     elif LLM is not None and INDEX is not None:
         results, context = query_index(INDEX, text, FILTER)
-        await update.message.reply_text(context)
+        await update.message.reply_text(f"Resultado da busca no índice:\n{context}")
         prompt = PROMPT.format(
             context=context,
             question=text,
@@ -167,6 +190,7 @@ if __name__ == "__main__":
 
     # Commands
     app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("reset", reset_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("echo", echo_command))
     app.add_handler(CommandHandler("load", load_command))

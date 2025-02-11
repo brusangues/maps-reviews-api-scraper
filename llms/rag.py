@@ -15,9 +15,10 @@ import time
 import json
 from tqdm import tqdm
 import os
+import re
 
 from llms.utils import timeit
-from llms.models import load_model, load_embedding, query_model_async
+from llms.models import load_model, load_embedding, query_model, query_model_async
 
 # logging.basicConfig(level=logging.DEBUG)
 # set_debug(True)
@@ -34,6 +35,38 @@ Responda depois da tag RESPOSTA.
 PERGUNTA:\n{question}\n
 CONTEXTO:\n{context}\n
 RESPOSTA:"""
+
+PROMPT_QUERY = """
+Com base na PERGUNTA do usuário, monte um JSON de query de MongoDB com os seguintes operadores:
+$eq (igual a)
+$neq (não igual a)
+$gt (maior que)
+$lt (menor que)
+$gte (maior ou igual a)
+$lte (menor ou igual a)
+$in (pertence à lista)
+$nin (não pertence à lista)
+$and (todas as condições devem corresponder)
+$or (qualquer condição deve corresponder)
+$not (negação da condição)
+
+Os metadados nos quais esses operadores podem ser aplicados são os seguintes:
+'name' - Nome do hotel.
+'stars' - Número de estrelas do hotel de 0 a 5.
+'region' - Região do Brasil. ['SUDESTE', 'NORTE', 'NORDESTE', 'SUL', 'CENTRO-OESTE']
+'state' - Duas letras representando a sigla do estado do Brasil. ['RJ', 'RO', 'BA', 'PE', 'MG', 'SP', 'SC', 'AM', 'CE', 'PR', 'PA', 'AL', 'GO', 'RS', 'RN', 'DF', 'RR', 'MS', 'TO', 'MT', 'PB', 'ES', 'MA']
+'rating' - Classificação da avaliação de 1 a 5.
+
+Monte JSONs de acordo com os seguintes exemplos:
+PERGUNTA: Qual o melhor hotel com 3 estrelas ou mais?
+JSON: {'stars': {'$gte': 3}}\n
+PERGUNTA: Qual o melhor hotel no estado de SP?
+JSON: {'state': {'$eq': 'SP'}}\n
+PERGUNTA: Quero um hotel de 4 estrelas pé na areia.
+JSON: {'stars': {'$eq': 4}}\n
+FIM DOS EXEMPLOS!!!\n
+Responda apenas com o json adequado, sem explicar a resposta.\n
+"""
 CREATE_INDEX = False
 PATH_INDEX = "data/faiss_index_full_v2"
 INDEX_BATCH_SIZE = 20_000
@@ -169,7 +202,42 @@ def query_with_user_input(vector_store: FAISS, llm: HuggingFacePipeline):
             context=context,
             question=query,
         )
-        response = asyncio.run(query_model_async(llm, prompt))
+        # response = asyncio.run(query_model_async(llm, prompt))
+        response = query_model(llm, prompt)
+        # print(response)
+        print("\n", "=" * 100, "\n")
+
+
+def query_make_filter(llm: HuggingFacePipeline, query: str):
+    prompt_query = PROMPT_QUERY + f"PERGUNTA: {query}\nJSON: "
+    filter_raw = query_model(llm, prompt_query)
+    filter = {}
+    try:
+        filter_raw = filter_raw.replace("```json", "").split("```")[0]
+        filter = json.loads(filter_raw)
+        print(f"Filtro carregado via llm:\n{filter}")
+    except Exception as e:
+        print(e)
+    return filter
+
+
+def query_with_user_input_v2(vector_store: FAISS, llm: HuggingFacePipeline):
+    print("Starting main loop...")
+    print("=" * 100)
+    while True:
+        query = input("\nEnter query:\n")
+        if "exit" in query:
+            print("Exiting...")
+            break
+
+        filter = query_make_filter(llm, query)
+        results, context = query_index(vector_store, query, filter)
+        prompt = PROMPT.format(
+            context=context,
+            question=query,
+        )
+        # response = asyncio.run(query_model_async(llm, prompt))
+        response = query_model(llm, prompt)
         # print(response)
         print("\n", "=" * 100, "\n")
 
@@ -182,6 +250,6 @@ if __name__ == "__main__":
 
     vector_store = load_index(embeddings)
 
-    llm, _, _ = load_model()
+    llm, _, _ = load_model("gemini-1.5-pro")
 
-    query_with_user_input(vector_store, llm)
+    query_with_user_input_v2(vector_store, llm)

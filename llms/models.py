@@ -33,7 +33,7 @@ models_embedding = {
     "modernbert": "nomic-ai/modernbert-embed-base",
     "e5": "intfloat/multilingual-e5-large",
 }
-MAX_NEW_TOKENS = 200
+MAX_NEW_TOKENS = 1000
 
 
 class GeminiHuggingFacePipeline:
