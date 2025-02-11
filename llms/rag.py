@@ -182,6 +182,6 @@ if __name__ == "__main__":
 
     vector_store = load_index(embeddings)
 
-    llm, _ = load_model()
+    llm, _, _ = load_model()
 
     query_with_user_input(vector_store, llm)

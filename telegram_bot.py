@@ -1,12 +1,19 @@
-# pip install python-telegram-bot
+"""
+start - reiniciar ambiente
+echo - retorna a mensagem do usuário
+help - ajuda
+load - carrega um modelo de linguagem
+rag - carrega modelo de embedding e índice de busca semântica
+filter - configura um filtro para o índice de busca semântica
+"""
 
+# pip install python-telegram-bot
 import os
 import traceback
 from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
-    CallbackContext,
     MessageHandler,
     filters,
     ContextTypes,
@@ -14,7 +21,14 @@ from telegram.ext import (
 import torch
 import json
 
-from llms.models import load_model, load_embedding, query_model_async
+from llms.models import (
+    load_model,
+    load_embedding,
+    query_model,
+    query_model_async,
+    models_text,
+    models_embedding,
+)
 from llms.rag import load_index, query_index, PROMPT
 
 
@@ -35,6 +49,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Oi, eu sou um bot!")
 
 
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("\nhelp_command")
+    await update.message.reply_text(
+        f"Modelos de linguagem disponíveis:\n{models_text}\n"
+        f"Modelos de embedding disponíveis:\n{models_embedding}\n"
+        f"Comandos disponíveis: start, echo, load, rag ,filter, help"
+    )
+
+
 async def echo_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print("\necho_command")
     await update.message.reply_text(update.message.text)
@@ -47,8 +70,10 @@ async def load_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print("\nload_command")
     args = update.message.text.replace("/load", "").strip().split()
     print(f"{args=}")
-    LLM, model_name = load_model(*args)
-    await update.message.reply_text(f"Modelo carregado: {model_name}")
+    LLM, model_name, max_new_tokens = load_model(*args)
+    await update.message.reply_text(
+        f"Modelo carregado: {model_name}\nCom máximo de tokens: {max_new_tokens}"
+    )
 
 
 async def rag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -95,9 +120,9 @@ async def handle_response(update: Update, text: str) -> str:
             context=context,
             question=text,
         )
-        return await query_model_async(LLM, prompt)
+        return query_model(LLM, prompt)
     elif LLM is not None:
-        return await query_model_async(LLM, text)
+        return query_model(LLM, text)
     return (
         "Nenhum modelo está carregado. "
         "Use o comando /load para carregar um modelo de linguagem. "
@@ -142,6 +167,7 @@ if __name__ == "__main__":
 
     # Commands
     app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("echo", echo_command))
     app.add_handler(CommandHandler("load", load_command))
     app.add_handler(CommandHandler("rag", rag_command))

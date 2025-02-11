@@ -5,6 +5,8 @@ import torch
 import transformers
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_huggingface import HuggingFacePipeline
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.outputs import Generation, LLMResult
 
 from analysis.src.utils import timeit
 
@@ -20,35 +22,63 @@ models_text = {
     "llama3b": "unsloth/Llama-3.2-3B-Instruct-bnb-4bit",
     "gemma2b": "unsloth/gemma-2-2b-it-bnb-4bit",
     "phi": "unsloth/Phi-3.5-mini-instruct-bnb-4bit",
+    "gemini-2.0-flash": "gemini-2.0-flash",
+    "gemini-2.0-flash-lite": "gemini-2.0-flash-lite-preview-02-05",
+    "gemini-1.5-flash": "gemini-1.5-flash",
+    "gemini-1.5-flash-8b": "gemini-1.5-flash-8b",
+    "gemini-1.5-pro": "gemini-1.5-pro",
 }
 models_embedding = {
     "gte": "Alibaba-NLP/gte-multilingual-base",
     "modernbert": "nomic-ai/modernbert-embed-base",
+    "e5": "intfloat/multilingual-e5-large",
 }
-MAX_NEW_TOKENS = 100
+MAX_NEW_TOKENS = 200
+
+
+class GeminiHuggingFacePipeline:
+    def __init__(self, model):
+        self.model = model
+        self.pipeline = None
+
+    def generate(self, prompts, **kwargs):
+        results = []
+        for prompt in prompts:
+            response = self.model.invoke(prompt)
+            generation = Generation(text=response.content)
+            results.append([generation])
+        return LLMResult(generations=results)
 
 
 @timeit
 def load_model(model_alias="llama1b", max_new_tokens=MAX_NEW_TOKENS):
     print("load_model...")
     model_name = models_text.get(model_alias, models_text["llama1b"])
-    max_new_tokens = min(int(max_new_tokens), MAX_NEW_TOKENS)
-    print(f"{model_alias=} {model_name=}")
-    pipe = transformers.pipeline(
-        task="text-generation",
-        # temperature=1e-10,
-        # device=0,
-        model=model_name,
-        # pad_token_id=128001,
-        max_new_tokens=max_new_tokens,
-        return_full_text=False,
-        # truncation=True, do_sample=True,
-        # top_k=50, top_p=0.95,
-    )
-    # Instantiate the HuggingFacePipeline with the loaded pipeline
-    llm = HuggingFacePipeline(pipeline=pipe)
+    print(f"{model_alias=} {model_name=} {max_new_tokens=}")
+    if model_name.startswith("gemini"):
+        llm = ChatGoogleGenerativeAI(
+            model=model_name,
+            temperature=0,
+            max_new_tokens=max_new_tokens,
+            timeout=10,
+            max_retries=2,
+        )
+        llm = GeminiHuggingFacePipeline(model=llm)
+    else:
+        pipe = transformers.pipeline(
+            task="text-generation",
+            # temperature=1e-10,
+            # device=0,
+            model=model_name,
+            # pad_token_id=128001,
+            max_new_tokens=max_new_tokens,
+            return_full_text=False,
+            # truncation=True, do_sample=True,
+            # top_k=50, top_p=0.95,
+        )
+        llm = HuggingFacePipeline(pipeline=pipe)
     print(f"{llm=}")
-    return llm, model_name
+    return llm, model_name, max_new_tokens
 
 
 @timeit
@@ -68,7 +98,10 @@ def query_model(llm: HuggingFacePipeline, prompt: str):
     print("query_model...")
     print(f"{len(prompt)=} {prompt=}")
     # Calculate the number of input tokens using the model tokenizer
-    num_input_tokens = len(llm.pipeline.tokenizer.encode(prompt))
+    if llm.pipeline is None:
+        num_input_tokens = len(prompt.split())
+    else:
+        num_input_tokens = len(llm.pipeline.tokenizer.encode(prompt))
     print(f"{num_input_tokens=}")
     llmresult = llm.generate([prompt])
     response = llmresult.generations[0][0].text
@@ -102,5 +135,5 @@ async def query_model_async(llm: HuggingFacePipeline, prompt: str):
 
 
 if __name__ == "__main__":
-    llm, _ = load_model()
+    llm, _, _ = load_model()
     query_model(llm, "How much is 1 + 1?")
