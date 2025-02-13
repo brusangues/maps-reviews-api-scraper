@@ -11,45 +11,80 @@ from dateutils import relativedelta
 from unidecode import unidecode
 from tqdm import tqdm
 
-from analysis.src.config import *
+from analysis.src.config import (
+    input_cols,
+    agg_dict,
+    text_agg_dict,
+    feature_cols,
+    text_cols,
+    full_cols,
+    relative_date_maps,
+    translated_text_maps,
+    csv_reviews_cols,
+)
 from analysis.src.preprocessing import map_progress, tokenizer_lemma
 
 tqdm.pandas()
 
 
 def read_data(input_file: str, data_path: str) -> pd.DataFrame:
-    # Reading input
-    input = pd.read_csv(input_file, sep=",", encoding="utf-8")
-    input = input[input_cols]
-    input = input.rename(columns={"name": "name_input"})
+    print("read_data...")
 
-    # Reading metadata
+    print("Lendo arquivo de input")
+    input = pd.read_csv(input_file, sep=",", encoding="utf-8")
+    print(f"{input.shape=}")
+    # input = input[input_cols]
+    input = input.rename(columns={"name": "name_input", "n_reviews": "n_reviews_input"})
+    print(f"{input.columns=}")
+
+    print("Lendo metadados dos hotéis baixados no início da raspagem")
     metadata = []
-    for f in Path(data_path).glob("*.json"):
+    jsons = list(Path(data_path).glob("*.json"))
+    for f in tqdm(jsons, total=len(jsons)):
         d = json.loads(f.read_text(encoding="utf-8"))
         d["file_name"] = f.stem
         metadata.append(d)
 
     metadata = pd.DataFrame.from_records(metadata)
+    print(f"{metadata.shape=}")
     metadata = metadata.rename(columns={"retrieval_date": "retrieval_date_metadata"})
-    logging.info(metadata)
+    print(f"{metadata.columns=}")
 
-    # Reading data
+    print("Lendo avaliações dos hotéis")
     dfs = []
-    for f in Path(data_path).glob("*.csv"):
-        df = pd.read_csv(f, sep=",", encoding="utf-8")
+    csvs = list(Path(data_path).glob("*.csv"))
+    for f in tqdm(csvs, total=len(csvs)):
+        df = pd.read_csv(
+            f,
+            sep=",",
+            encoding="utf-8",
+            names=csv_reviews_cols,
+            header=None,
+            low_memory=False,
+            skiprows=0,
+        )
         df["file_name"] = f.stem
         dfs.append(df)
-
     df_reviews = pd.concat(dfs, axis=0)
-    logging.info(df_reviews)
+    print(f"{df_reviews.shape=}")
+    print(f"{df_reviews.columns=}")
 
-    # Merging
+    print("Removendo lixo das avaliações dos hotéis")
+    df_reviews = df_reviews.loc[~(df_reviews.iloc[:, 0] == csv_reviews_cols[0])]
+    print(f"{df_reviews.shape=}")
+
+    print("Unindo as diferentes fontes de dados")
+    print("Merge input metadata")
     df_hotels = input.merge(metadata, on="url", how="left", validate="one_to_many")
+    print(f"{df_hotels.shape=}")
+    print("Removendo hotéis sem metadados (file_name.isna())")
     df_hotels = df_hotels[~df_hotels.file_name.isna()]
+    print(f"{df_hotels.shape=}")
+    print("Merge avaliações")
     df_merge = df_hotels.merge(df_reviews, on="file_name", validate="one_to_many")
+    print(f"{df_merge.shape=}")
+    print(f"{df_merge.columns=}")
 
-    logging.info(df_merge)
     return df_merge
 
 

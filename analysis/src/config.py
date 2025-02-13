@@ -89,6 +89,27 @@ feature_cols = [
     "response_relative_date",
 ]
 
+csv_reviews_cols = [
+    "token",
+    "review_id",
+    "retrieval_date",
+    "rating",
+    "rating_max",
+    "relative_date",
+    "likes",
+    "other_ratings",
+    "trip_type_travel_group",
+    "user_name",
+    "user_is_local_guide",
+    "user_reviews",
+    "user_photos",
+    "user_url",
+    "text",
+    "response_text",
+    "response_relative_date",
+    "errors",
+]
+
 text_cols = [
     # Input
     "hl",
