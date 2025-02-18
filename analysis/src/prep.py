@@ -91,21 +91,26 @@ def read_data(input_file: str, data_path: str) -> pd.DataFrame:
 def prep_complete(
     df_merge: pd.DataFrame, lat_long_path: str = "analysis/artifacts/lat_long.csv"
 ):
-    print("drop duplicates")
     df = df_merge.copy()
+    print(f"{df.shape=}")
+
+    print("drop duplicates")
     df = df.drop_duplicates(subset="review_id").reset_index(drop=True)
+    print(f"{df.shape=}")
 
     print("likes")
     df.loc[:, "likes"] = df.likes.replace({-1: 0}).fillna(0)
+    print(f"{df.likes.value_counts()=}")
 
     print("trip_type_travel_group")  # trip_type_travel_group
     df.loc[:, "trip_type_travel_group"] = df.trip_type_travel_group.apply(
         lambda x: x if pd.isna(x) else x.split(" | ")
     )
+    print(f"{df.trip_type_travel_group.value_counts()=}")
 
-    print("lattitude and longitude")
-    lat_long = pd.read_csv(lat_long_path)
-    df = df.merge(lat_long, on="name", how="inner", validate="many_to_one")
+    # print("lattitude and longitude")
+    # lat_long = pd.read_csv(lat_long_path)
+    # df = df.merge(lat_long, on="name", how="inner", validate="many_to_one")
 
     print("relative dates")
     df.loc[:, "review_date"] = df.progress_apply(
@@ -124,33 +129,33 @@ def prep_complete(
         result_type="expand",
     )
 
-    print("Topics")
-    df[["topic_names", "topic_counts"]] = df.progress_apply(
-        lambda x: parse_topics(x.topics),
-        axis=1,
-        result_type="expand",
-    )
+    # print("Topics")
+    # df[["topic_names", "topic_counts"]] = df.progress_apply(
+    #     lambda x: parse_topics(x.topics),
+    #     axis=1,
+    #     result_type="expand",
+    # )
 
     print("User")
     df["user_id"] = df.user_url.progress_apply(parse_user_id)
 
-    print("Text")
-    df[["text_is_other_language", "text"]] = df.progress_apply(
-        lambda x: parse_translated_text(x["text"]),
-        axis=1,
-        result_type="expand",
-    )
-    df[["response_text_is_other_language", "response_text"]] = df.progress_apply(
-        lambda x: parse_translated_text(x["response_text"]),
-        axis=1,
-        result_type="expand",
-    )
+    # print("Text")
+    # df[["text_is_other_language", "text"]] = df.progress_apply(
+    #     lambda x: parse_translated_text(x["text"]),
+    #     axis=1,
+    #     result_type="expand",
+    # )
+    # df[["response_text_is_other_language", "response_text"]] = df.progress_apply(
+    #     lambda x: parse_translated_text(x["response_text"]),
+    #     axis=1,
+    #     result_type="expand",
+    # )
 
-    print("tokens")
-    df.loc[:, "text_tokens"] = map_progress(tokenizer_lemma, df.text)
-    df.loc[:, "text_tokens_len"] = df["text_tokens"].apply(len)
-    df.loc[:, "response_text_tokens"] = map_progress(tokenizer_lemma, df.response_text)
-    df.loc[:, "response_text_tokens_len"] = df["response_text_tokens"].apply(len)
+    # print("tokens")
+    # df.loc[:, "text_tokens"] = map_progress(tokenizer_lemma, df.text)
+    # df.loc[:, "text_tokens_len"] = df["text_tokens"].apply(len)
+    # df.loc[:, "response_text_tokens"] = map_progress(tokenizer_lemma, df.response_text)
+    # df.loc[:, "response_text_tokens_len"] = df["response_text_tokens"].apply(len)
 
     return df
 

@@ -43,7 +43,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global LLM, INDEX, FILTER
     del LLM, INDEX, FILTER
     torch.cuda.empty_cache()
-    LLM, _, _ = load_model("gemini-1.5-flash")
+    LLM, _, _ = load_model("gemini-2.0-flash")
     embedding, _ = load_embedding()
     INDEX = load_index(embedding)
     FILTER = {}
@@ -127,9 +127,9 @@ async def handle_response(update: Update, text: str) -> str:
     if "oi" == text.lower():
         return "Oi de novo, eu sou um bot!"
     elif LLM is not None and INDEX is not None and len(FILTER.keys()) == 0:
-        filter = query_make_filter(LLM, text)
+        filter, query_updated = query_make_filter(LLM, text)
         await update.message.reply_text(f"Filtro criado dinamicamente: {filter}")
-        results, context = query_index(INDEX, text, filter)
+        results, context = query_index(INDEX, query_updated, filter)
         await update.message.reply_text(f"Resultado da busca no índice:\n{context}")
         prompt = PROMPT.format(
             context=context,

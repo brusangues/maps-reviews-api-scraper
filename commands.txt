@@ -1,0 +1,51 @@
+# scraper
+conda activate pln
+cd scraper
+python -m app run-async --path ./input/hotels_2025_lt100.csv
+
+# make index
+conda activate cu124
+python -m llms.rag
+
+# gpu
+nvidia-smi -l 1
+
+embeddings=HuggingFaceEmbeddings(model_name='intfloat/multilingual-e5-large-instruct', cache_folder=None, model_kwargs={'trust_remote_code': True}, encode_kwargs={}, multi_process=False, show_progress=False)
+(1000, 22)
+load_data took: 0.7969841957092285
+27:30
+create_index took: 1650.9912536144257
+
+embeddings=HuggingFaceEmbeddings(model_name='Snowflake/snowflake-arctic-embed-l-v2.0', cache_folder=None, model_kwargs={'trust_remote_code': True}, encode_kwargs={}, multi_process=False, show_progress=Fe_kwargs={}, multi_process=False, show_progress=False)
+(1000, 22)
+load_data took: 0.3524594306945801
+33:56
+create_index took: 2036.5001509189606
+
+embeddings=HuggingFaceEmbeddings(model_name='Alibaba-NLP/gte-multilingual-base', cache_folder=None, model_kwargs={'trust_remote_code': True}, encode_kwargs={}, multi_process=False, show_progress=False)
+(100, 22)
+load_data took: 0.5754556655883789
+01:25
+create_index took: 85.95823788642883
+
+embeddings=HuggingFaceEmbeddings(model_name='Alibaba-NLP/gte-multilingual-base', cache_folder=None, model_kwargs={'trust_remote_code': True}, encode_kwargs={}, multi_process=False, show_progress=False)
+(1000, 22)
+load_data took: 0.3690152168273926
+02:29
+create_index took: 149.51307559013367
+
+(cu124) C:\Users\Bruno\Documents\GitHub\pgc2_23_01_29>python -m llms.rag
+load_embedding...
+model_alias='google-4' model_name='models/text-embedding-004' task_type='retrieval_document'
+Loading GoogleGenerativeAIEmbeddings model...
+embeddings=GoogleGenerativeAIEmbeddings(client=<google.ai.generativelanguage_v1beta.services.generative_service.client.GenerativeServiceClient object at 0x00000210C568B5D0>, model='models/text-embedding-004', task_type='retrieval_document', google_api_key=SecretStr('**********'), credentials=None, client_options=None, transport=None, request_options=None)
+Loading data...
+(222923, 22)
+(222923, 22)
+load_data took: 0.9047060012817383
+Creating index...
+Loading docs...
+Embedding docs...
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 23/23 [41:07<00:00, 107.28s/it]
+Index creation finished!
+create_index took: 2513.964348554611

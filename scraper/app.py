@@ -6,6 +6,7 @@ from multiprocessing import Pool
 import pandas as pd
 import typer
 import traceback
+import time
 
 from src.scraper import GoogleMapsAPIScraper
 from src.config import review_default_result, metadata_default
@@ -14,7 +15,7 @@ from src.custom_logger import get_logger
 app = typer.Typer()
 logger = get_logger("google_maps_api_scraper")
 
-n_processes = 8
+n_processes = 16
 file_path = "input/hotels.csv"
 places_path = "data/places.csv"
 
@@ -48,6 +49,7 @@ def call_pools(df_list: list) -> list:
     results = []
     with Pool(processes=n_processes) as pool:
         for row in df_list:
+            time.sleep(0.01)
             p = pool.apply_async(
                 func=call_scraper,
                 kwds=row,
