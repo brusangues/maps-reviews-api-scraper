@@ -5,6 +5,8 @@ import json
 from multiprocessing import Pool
 import pandas as pd
 import typer
+import traceback
+import time
 
 from src.scraper import GoogleMapsAPIScraper
 from src.config import review_default_result, metadata_default
@@ -13,7 +15,7 @@ from src.custom_logger import get_logger
 app = typer.Typer()
 logger = get_logger("google_maps_api_scraper")
 
-n_processes = 8
+n_processes = 16
 file_path = "input/hotels.csv"
 places_path = "data/places.csv"
 
@@ -47,6 +49,7 @@ def call_pools(df_list: list) -> list:
     results = []
     with Pool(processes=n_processes) as pool:
         for row in df_list:
+            time.sleep(0.01)
             p = pool.apply_async(
                 func=call_scraper,
                 kwds=row,
@@ -97,12 +100,18 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
         # Create csv writer for metadata
         write_places_header = not Path(places_path).exists()
         metadata = {}
+        reviews = []
         with open(places_path, "a+", encoding="utf-8", newline="\n") as file:
             writer = csv.writer(file, quoting=csv.QUOTE_NONNUMERIC)
             if write_places_header:
                 writer.writerow(metadata_default.keys())
 
-            metadata = scraper.scrape_place(url, writer, file, name)
+            try:
+                metadata = scraper.scrape_place(url, writer, file, name)
+            except Exception as e:
+                logger.exception("Error in scraper.scrape_place")
+                traceback.print_exc()
+                raise
 
         # Create json for metadata
         with open(path + place_file_name, "w", encoding="latin1") as f:
@@ -113,7 +122,6 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
             n_reviews = metadata["n_reviews"]
 
         # Create csv writer and start scraping
-        reviews = []
         with open(
             path + reviews_file_name, "a+", encoding="utf-8", newline="\n"
         ) as file:
@@ -127,7 +135,8 @@ def call_scraper(name: str, n_reviews: int, url: str, sort_by: str, hl: str, **k
                 )
             except Exception as e:
                 logger.exception("Error in scraper.scrape_reviews")
-                raise
+                traceback.print_exc()
+                # raise
 
     return reviews, metadata
 

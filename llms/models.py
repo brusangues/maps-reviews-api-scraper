@@ -5,7 +5,7 @@ import torch
 import transformers
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_huggingface import HuggingFacePipeline
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_core.outputs import Generation, LLMResult
 
 from analysis.src.utils import timeit
@@ -32,8 +32,13 @@ models_embedding = {
     "gte": "Alibaba-NLP/gte-multilingual-base",
     "modernbert": "nomic-ai/modernbert-embed-base",
     "e5": "intfloat/multilingual-e5-large",
+    "e5-instruct": "intfloat/multilingual-e5-large-instruct",
+    "arctic": "Snowflake/snowflake-arctic-embed-l-v2.0",
+    "google-4": "models/text-embedding-004",
+    # "google-5": "models/text-embedding-005",
+    # "google-m2": "models/text-multilingual-embedding-002",
 }
-MAX_NEW_TOKENS = 1000
+MAX_NEW_TOKENS = 3000
 
 
 class GeminiHuggingFacePipeline:
@@ -51,11 +56,12 @@ class GeminiHuggingFacePipeline:
 
 
 @timeit
-def load_model(model_alias="llama1b", max_new_tokens=MAX_NEW_TOKENS):
+def load_model(model_alias="gemini-2.0-flash", max_new_tokens=MAX_NEW_TOKENS):
     print("load_model...")
-    model_name = models_text.get(model_alias, models_text["llama1b"])
+    model_name = models_text.get(model_alias, models_text["gemini-2.0-flash"])
     print(f"{model_alias=} {model_name=} {max_new_tokens=}")
     if model_name.startswith("gemini"):
+        print("Loading ChatGoogleGenerativeAI model...")
         llm = ChatGoogleGenerativeAI(
             model=model_name,
             temperature=0,
@@ -65,6 +71,7 @@ def load_model(model_alias="llama1b", max_new_tokens=MAX_NEW_TOKENS):
         )
         llm = GeminiHuggingFacePipeline(model=llm)
     else:
+        print("Loading transformers.pipeline local model...")
         pipe = transformers.pipeline(
             task="text-generation",
             # temperature=1e-10,
@@ -82,13 +89,21 @@ def load_model(model_alias="llama1b", max_new_tokens=MAX_NEW_TOKENS):
 
 
 @timeit
-def load_embedding(model_alias="gte"):
+def load_embedding(model_alias="google-4", task_type="retrieval_query"):
     print("load_embedding...")
-    model_name = models_embedding.get(model_alias, models_embedding["gte"])
-    print(f"{model_alias=} {model_name=}")
-    embeddings = HuggingFaceEmbeddings(
-        model_name=model_name, model_kwargs={"trust_remote_code": True}
-    )
+    model_name = models_embedding.get(model_alias, models_embedding["google-4"])
+    print(f"{model_alias=} {model_name=} {task_type=}")
+    if model_alias.startswith("google"):
+        print("Loading GoogleGenerativeAIEmbeddings model...")
+        embeddings = GoogleGenerativeAIEmbeddings(
+            model=model_name,
+            task_type=task_type,
+        )
+    else:
+        print("Loading HuggingFaceEmbeddings model...")
+        embeddings = HuggingFaceEmbeddings(
+            model_name=model_name, model_kwargs={"trust_remote_code": True}
+        )
     print(f"{embeddings=}")
     return embeddings, model_name
 

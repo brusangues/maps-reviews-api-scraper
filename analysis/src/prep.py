@@ -11,66 +11,106 @@ from dateutils import relativedelta
 from unidecode import unidecode
 from tqdm import tqdm
 
-from analysis.src.config import *
+from analysis.src.config import (
+    input_cols,
+    agg_dict,
+    text_agg_dict,
+    feature_cols,
+    text_cols,
+    full_cols,
+    relative_date_maps,
+    translated_text_maps,
+    csv_reviews_cols,
+)
 from analysis.src.preprocessing import map_progress, tokenizer_lemma
 
 tqdm.pandas()
 
 
 def read_data(input_file: str, data_path: str) -> pd.DataFrame:
-    # Reading input
-    input = pd.read_csv(input_file, sep=",", encoding="utf-8")
-    input = input[input_cols]
-    input = input.rename(columns={"name": "name_input"})
+    print("read_data...")
 
-    # Reading metadata
+    print("Lendo arquivo de input")
+    input = pd.read_csv(input_file, sep=",", encoding="utf-8")
+    print(f"{input.shape=}")
+    # input = input[input_cols]
+    input = input.rename(columns={"name": "name_input", "n_reviews": "n_reviews_input"})
+    print(f"{input.columns=}")
+
+    print("Lendo metadados dos hotéis baixados no início da raspagem")
     metadata = []
-    for f in Path(data_path).glob("*.json"):
+    jsons = list(Path(data_path).glob("*.json"))
+    for f in tqdm(jsons, total=len(jsons)):
         d = json.loads(f.read_text(encoding="utf-8"))
         d["file_name"] = f.stem
         metadata.append(d)
 
     metadata = pd.DataFrame.from_records(metadata)
+    print(f"{metadata.shape=}")
     metadata = metadata.rename(columns={"retrieval_date": "retrieval_date_metadata"})
-    logging.info(metadata)
+    print(f"{metadata.columns=}")
 
-    # Reading data
+    print("Lendo avaliações dos hotéis")
     dfs = []
-    for f in Path(data_path).glob("*.csv"):
-        df = pd.read_csv(f, sep=",", encoding="utf-8")
+    csvs = list(Path(data_path).glob("*.csv"))
+    for f in tqdm(csvs, total=len(csvs)):
+        df = pd.read_csv(
+            f,
+            sep=",",
+            encoding="utf-8",
+            names=csv_reviews_cols,
+            header=None,
+            low_memory=False,
+            skiprows=0,
+        )
         df["file_name"] = f.stem
         dfs.append(df)
-
     df_reviews = pd.concat(dfs, axis=0)
-    logging.info(df_reviews)
+    print(f"{df_reviews.shape=}")
+    print(f"{df_reviews.columns=}")
 
-    # Merging
+    print("Removendo lixo das avaliações dos hotéis")
+    df_reviews = df_reviews.loc[~(df_reviews.iloc[:, 0] == csv_reviews_cols[0])]
+    print(f"{df_reviews.shape=}")
+
+    print("Unindo as diferentes fontes de dados")
+    print("Merge input metadata")
     df_hotels = input.merge(metadata, on="url", how="left", validate="one_to_many")
+    print(f"{df_hotels.shape=}")
+    print("Removendo hotéis sem metadados (file_name.isna())")
     df_hotels = df_hotels[~df_hotels.file_name.isna()]
+    print(f"{df_hotels.shape=}")
+    print("Merge avaliações")
     df_merge = df_hotels.merge(df_reviews, on="file_name", validate="one_to_many")
+    print(f"{df_merge.shape=}")
+    print(f"{df_merge.columns=}")
 
-    logging.info(df_merge)
     return df_merge
 
 
 def prep_complete(
     df_merge: pd.DataFrame, lat_long_path: str = "analysis/artifacts/lat_long.csv"
 ):
-    print("drop duplicates")
     df = df_merge.copy()
+    print(f"{df.shape=}")
+
+    print("drop duplicates")
     df = df.drop_duplicates(subset="review_id").reset_index(drop=True)
+    print(f"{df.shape=}")
 
     print("likes")
     df.loc[:, "likes"] = df.likes.replace({-1: 0}).fillna(0)
+    print(f"{df.likes.value_counts()=}")
 
     print("trip_type_travel_group")  # trip_type_travel_group
     df.loc[:, "trip_type_travel_group"] = df.trip_type_travel_group.apply(
         lambda x: x if pd.isna(x) else x.split(" | ")
     )
+    print(f"{df.trip_type_travel_group.value_counts()=}")
 
-    print("lattitude and longitude")
-    lat_long = pd.read_csv(lat_long_path)
-    df = df.merge(lat_long, on="name", how="inner", validate="many_to_one")
+    # print("lattitude and longitude")
+    # lat_long = pd.read_csv(lat_long_path)
+    # df = df.merge(lat_long, on="name", how="inner", validate="many_to_one")
 
     print("relative dates")
     df.loc[:, "review_date"] = df.progress_apply(
@@ -89,33 +129,33 @@ def prep_complete(
         result_type="expand",
     )
 
-    print("Topics")
-    df[["topic_names", "topic_counts"]] = df.progress_apply(
-        lambda x: parse_topics(x.topics),
-        axis=1,
-        result_type="expand",
-    )
+    # print("Topics")
+    # df[["topic_names", "topic_counts"]] = df.progress_apply(
+    #     lambda x: parse_topics(x.topics),
+    #     axis=1,
+    #     result_type="expand",
+    # )
 
     print("User")
     df["user_id"] = df.user_url.progress_apply(parse_user_id)
 
-    print("Text")
-    df[["text_is_other_language", "text"]] = df.progress_apply(
-        lambda x: parse_translated_text(x["text"]),
-        axis=1,
-        result_type="expand",
-    )
-    df[["response_text_is_other_language", "response_text"]] = df.progress_apply(
-        lambda x: parse_translated_text(x["response_text"]),
-        axis=1,
-        result_type="expand",
-    )
+    # print("Text")
+    # df[["text_is_other_language", "text"]] = df.progress_apply(
+    #     lambda x: parse_translated_text(x["text"]),
+    #     axis=1,
+    #     result_type="expand",
+    # )
+    # df[["response_text_is_other_language", "response_text"]] = df.progress_apply(
+    #     lambda x: parse_translated_text(x["response_text"]),
+    #     axis=1,
+    #     result_type="expand",
+    # )
 
-    print("tokens")
-    df.loc[:, "text_tokens"] = map_progress(tokenizer_lemma, df.text)
-    df.loc[:, "text_tokens_len"] = df["text_tokens"].apply(len)
-    df.loc[:, "response_text_tokens"] = map_progress(tokenizer_lemma, df.response_text)
-    df.loc[:, "response_text_tokens_len"] = df["response_text_tokens"].apply(len)
+    # print("tokens")
+    # df.loc[:, "text_tokens"] = map_progress(tokenizer_lemma, df.text)
+    # df.loc[:, "text_tokens_len"] = df["text_tokens"].apply(len)
+    # df.loc[:, "response_text_tokens"] = map_progress(tokenizer_lemma, df.response_text)
+    # df.loc[:, "response_text_tokens_len"] = df["response_text_tokens"].apply(len)
 
     return df
 

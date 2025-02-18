@@ -23,13 +23,15 @@ from llms.models import load_model, load_embedding, query_model, query_model_asy
 # logging.basicConfig(level=logging.DEBUG)
 # set_debug(True)
 
+QUERY_PREFIX_E5_INSTRUCT = "Instruct: Given a Portuguese question, retrieve relevant hotel reviews that best answer the question. \nQuery: "
 DOC_PREFIX = ""
 QUERY_PREFIX = ""
 PROMPT = """
 Você é um assistente para tarefas de resposta a perguntas em português.
-Leia a PERGUNTA e use os seguintes trechos de CONTEXTO recuperado para respondê-la.
+Leia a PERGUNTA e use os seguintes trechos de CONTEXTO recuperado de avaliações de hotéis para respondê-la.
+Quanto menor o SCORE, maior é a similaridade da avaliação com a PERGUNTA.
 Se você não souber a resposta, apenas diga que não sabe. 
-Use apenas uma frase e mantenha a resposta concisa, em poucas palavras.
+Mantenha a resposta concisa.
 Responda depois da tag RESPOSTA.
 \n
 PERGUNTA:\n{question}\n
@@ -49,40 +51,56 @@ $nin (não pertence à lista)
 $and (todas as condições devem corresponder)
 $or (qualquer condição deve corresponder)
 $not (negação da condição)
+Evite de utilizar operadores $and e $or no nível superior de queries sem necessidade.
 
 Os metadados nos quais esses operadores podem ser aplicados são os seguintes:
-'name' - Nome do hotel.
-'stars' - Número de estrelas do hotel de 0 a 5.
-'region' - Região do Brasil. ['SUDESTE', 'NORTE', 'NORDESTE', 'SUL', 'CENTRO-OESTE']
-'state' - Duas letras representando a sigla do estado do Brasil. ['RJ', 'RO', 'BA', 'PE', 'MG', 'SP', 'SC', 'AM', 'CE', 'PR', 'PA', 'AL', 'GO', 'RS', 'RN', 'DF', 'RR', 'MS', 'TO', 'MT', 'PB', 'ES', 'MA']
-'rating' - Classificação da avaliação de 1 a 5.
+"nome": Nome do hotel.
+"estrelas": Número de estrelas do hotel, variando de 0 a 5.
+"cidade": Nome da cidade onde o hotel está localizado. Exemplos ["São Paulo", "Rio de Janeiro"]
+"sigla_estado": Código de duas letras representando o estado brasileiro onde o hotel está localizado em caixa alta. ["RJ", "RO", "BA", "PE", "MG", "SP", "SC", "AM", "CE", "PR", "PA", "AL", "GO", "RS", "RN", "DF", "RR", "MS", "TO", "MT", "PB", "ES", "MA"]
+"estado": Nome completo do estado onde o hotel está localizado em caixa alta. Exemplos ["SÃO PAULO", "RIO DE JANEIRO"]
+"capital_estado": Nome da capital do estado onde o hotel está localizado em caixa alta. Exemplos ["SÃO PAULO", "RIO DE JANEIRO"]
+"regiao": Região geográfica do Brasil onde o hotel está localizado. Valores possíveis: ["SUDESTE", "NORTE", "NORDESTE", "SUL", "CENTRO-OESTE"].
+"endereco": Endereço completo do hotel, incluindo rua, número, bairro, cidade e estado.
+"classificacao_geral": Nota geral do hotel baseada nas avaliações dos usuários, variando de 0.0 a 5.0.
+"quantidade_avaliacoes": Número total de avaliações recebidas pelo hotel.
+"nota_avaliacao": Nota específica da avaliação, variando de 1 a 5.
+"curtidas_avaliacao": Número de curtidas recebidas por uma avaliação.
+"usuario_guia_local": Indica se o usuário que fez a avaliação é um Guia Local do Google Maps (1 para sim, 0 para não).
+"data_avaliacao": Data em que a avaliação foi feita, no formato "YYYY-MM-DD".
+"nota_quartos": Nota dada pelos usuários para os quartos do hotel, variando de 1 a 5.
+"nota_localizacao": Nota dada pelos usuários para a localização do hotel, variando de 1 a 5.
+"nota_servico": Nota dada pelos usuários para o serviço do hotel, variando de 1 a 5.
+"avaliacao_recente": Indica se a avaliação foi feita dentro de 6 meses (1 para sim, 0 para não).
+"numero_palavras_avaliacao": Quantidade de palavras contidas na avaliação do usuário.
 
-Monte JSONs de acordo com os seguintes exemplos:
+Após o JSON, inclua a pergunta reformulada, sem a parte que foi usada para montar a query.
+Siga os seguintes exemplos:
 PERGUNTA: Qual o melhor hotel com 3 estrelas ou mais?
-JSON: {'stars': {'$gte': 3}}\n
+RESPOSTA: ```json {"estrelas": {"$gte": 3}} ``` Qual o melhor hotel?\n
 PERGUNTA: Qual o melhor hotel no estado de SP?
-JSON: {'state': {'$eq': 'SP'}}\n
+RESPOSTA: ```json {"sigla_estado": {"$eq": "SP"}} ``` Qual o melhor hotel?\n
 PERGUNTA: Quero um hotel de 4 estrelas pé na areia.
-JSON: {'stars': {'$eq': 4}}\n
+RESPOSTA: ```json {"estrelas": {"$eq": 4}} ``` Quero um hotel pé na areia.\n
 FIM DOS EXEMPLOS!!!\n
-Responda apenas com o json adequado, sem explicar a resposta.\n
+Não explique a resposta e responda apenas com o JSON seguido da pergunta reformulada.\n
 """
 CREATE_INDEX = False
-PATH_INDEX = "data/faiss_index_full_v2"
-INDEX_BATCH_SIZE = 20_000
+PATH_INDEX = "data/faiss_index_google_v4"
+INDEX_BATCH_SIZE = 10_000
 N_SAMPLES = None
-N_RESPONSES = 5
+N_RESPONSES = 10
 MAX_VECTOR_STORES = 1000
+PATH_DATA = "data/df_prep_2024-12-09_08-23-45_627733.pq"
+PATH_DATA = "data/df_index_2025_v1.pq"
+EMBEDDING_MODEL = "google-4"
 
 
 @timeit
 def load_data(n_samples=N_SAMPLES):
     print("Loading data...")
-    df = pd.read_parquet("data/df_prep_2024-12-09_08-23-45_627733.pq")
+    df = pd.read_parquet(PATH_DATA)
     print(df.shape)
-    df = df.query("~text.isna() & text.str.len() > 20")[
-        ["name", "stars", "region", "state", "rating", "text"]
-    ]
     if n_samples is not None and n_samples < len(df):
         df = df.sample(n_samples, random_state=42)
     print(df.shape)
@@ -169,10 +187,10 @@ def query_index(vector_store: FAISS, query, filter: dict = {}):
     context = ""
     for i, (res, score) in enumerate(results):
         print_ = (
-            f" - Avaliação {i+1}, Score: {score:0.3f}\n"
-            f"Hotel: {res.metadata['name']}, {res.metadata['stars']} Estrelas. "
-            # f"Região:{res.metadata['region']}; Estado:{res.metadata['state']}\n"
-            f"Nota: {res.metadata['rating']}\nComentário: {res.page_content}\n\n"
+            f" - Avaliação {i+1}, Similaridade: {score:0.3f}\n"
+            f"Hotel: {res.metadata['nome']}, {res.metadata['estrelas']} Estrelas. "
+            f"Região:{res.metadata['regiao']}; Estado:{res.metadata['sigla_estado']}\n"
+            f"Nota: {res.metadata['nota_avaliacao']}\nAvaliação: {res.page_content}\n\n"
         )
         print(res.metadata, "\n", print_)
         context += print_
@@ -209,16 +227,32 @@ def query_with_user_input(vector_store: FAISS, llm: HuggingFacePipeline):
 
 
 def query_make_filter(llm: HuggingFacePipeline, query: str):
-    prompt_query = PROMPT_QUERY + f"PERGUNTA: {query}\nJSON: "
+    prompt_query = PROMPT_QUERY + f"PERGUNTA: {query}\nRESPOSTA: "
     filter_raw = query_model(llm, prompt_query)
     filter = {}
+    query_updated = None
     try:
-        filter_raw = filter_raw.replace("```json", "").split("```")[0]
+        filter_query = filter_raw.replace("```json", "").split("```")
+        query_updated = filter_query[1].strip()
+        filter_raw = filter_query[0].replace("'", '"')
         filter = json.loads(filter_raw)
         print(f"Filtro carregado via llm:\n{filter}")
     except Exception as e:
         print(e)
-    return filter
+    query_updated = query if query_updated is None else query_updated
+    print(f"{filter=}\n{query_updated=}")
+    return filter, query_updated
+
+
+def rag_loop(vector_store: FAISS, llm: HuggingFacePipeline, query: str):
+    filter, query_updated = query_make_filter(llm, query)
+    results, context = query_index(vector_store, query_updated, filter)
+    prompt = PROMPT.format(
+        context=context,
+        question=query,
+    )
+    response = query_model(llm, prompt)
+    return response
 
 
 def query_with_user_input_v2(vector_store: FAISS, llm: HuggingFacePipeline):
@@ -230,26 +264,19 @@ def query_with_user_input_v2(vector_store: FAISS, llm: HuggingFacePipeline):
             print("Exiting...")
             break
 
-        filter = query_make_filter(llm, query)
-        results, context = query_index(vector_store, query, filter)
-        prompt = PROMPT.format(
-            context=context,
-            question=query,
-        )
-        # response = asyncio.run(query_model_async(llm, prompt))
-        response = query_model(llm, prompt)
-        # print(response)
+        rag_loop(vector_store, llm, query)
         print("\n", "=" * 100, "\n")
 
 
 if __name__ == "__main__":
-    embeddings, _ = load_embedding()
     if CREATE_INDEX:
+        embeddings, _ = load_embedding(EMBEDDING_MODEL, task_type="retrieval_document")
         df_sample = load_data(N_SAMPLES)
         create_index(df_sample, embeddings)
+    else:
+        embeddings, _ = load_embedding(EMBEDDING_MODEL, task_type="retrieval_query")
+        vector_store = load_index(embeddings)
 
-    vector_store = load_index(embeddings)
+        llm, _, _ = load_model("gemini-2.0-flash")
 
-    llm, _, _ = load_model("gemini-1.5-pro")
-
-    query_with_user_input_v2(vector_store, llm)
+        query_with_user_input_v2(vector_store, llm)
