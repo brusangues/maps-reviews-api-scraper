@@ -128,14 +128,16 @@ async def handle_response(update: Update, text: str) -> str:
         return "Oi de novo, eu sou um bot!"
     elif LLM is not None and INDEX is not None and len(FILTER.keys()) == 0:
         filter, query_updated = query_make_filter(LLM, text)
-        await update.message.reply_text(f"Filtro criado dinamicamente: {filter}")
+        await update.message.reply_text(
+            f"Filtro criado dinamicamente: {filter}\nQuery atualizada: {query_updated}"
+        )
         results, context = query_index(INDEX, query_updated, filter)
         await update.message.reply_text(f"Resultado da busca no índice:\n{context}")
         prompt = PROMPT.format(
             context=context,
             question=text,
         )
-        return query_model(LLM, prompt)
+        return "Resposta final:\n" + query_model(LLM, prompt)
     elif LLM is not None and INDEX is not None:
         results, context = query_index(INDEX, text, FILTER)
         await update.message.reply_text(f"Resultado da busca no índice:\n{context}")
@@ -143,14 +145,14 @@ async def handle_response(update: Update, text: str) -> str:
             context=context,
             question=text,
         )
-        return query_model(LLM, prompt)
+        return "Resposta final:\n" + query_model(LLM, prompt)
     elif LLM is not None:
         return query_model(LLM, text)
     return (
         "Nenhum modelo está carregado. "
         "Use o comando /load para carregar um modelo de linguagem. "
         "Em seguida, use o comando /rag para carregar o índice de avaliações de hotéis. "
-        "Se desejar, use o comando /filter para definir um filtro para as avaliações."
+        "Se desejar, use o comando /filter para definir um filtro para as avaliações manualmente."
     )
 
 

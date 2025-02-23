@@ -1,6 +1,7 @@
 from uuid import uuid4
 import faiss
 import pandas as pd
+import numpy as np
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_community.vectorstores import FAISS
@@ -74,7 +75,7 @@ Os metadados nos quais esses operadores podem ser aplicados são os seguintes:
 "avaliacao_recente": Indica se a avaliação foi feita dentro de 6 meses (1 para sim, 0 para não).
 "numero_palavras_avaliacao": Quantidade de palavras contidas na avaliação do usuário.
 
-Após o JSON, inclua a pergunta reformulada, sem a parte que foi usada para montar a query.
+Após o JSON, inclua a pergunta reformulada, excluindo a parte que foi usada para montar a query.
 Siga os seguintes exemplos:
 PERGUNTA: Qual o melhor hotel com 3 estrelas ou mais?
 RESPOSTA: ```json {"estrelas": {"$gte": 3}} ``` Qual o melhor hotel?\n
@@ -86,14 +87,16 @@ FIM DOS EXEMPLOS!!!\n
 Não explique a resposta e responda apenas com o JSON seguido da pergunta reformulada.\n
 """
 CREATE_INDEX = False
-PATH_INDEX = "data/faiss_index_google_v4"
+NORMALIZE_INDEX = False
+PATH_INDEX = "data/faiss_index_gte_v5_ip"
 INDEX_BATCH_SIZE = 10_000
 N_SAMPLES = None
-N_RESPONSES = 10
+N_RESPONSES = 5
+FETCH_K = 1000
 MAX_VECTOR_STORES = 1000
-PATH_DATA = "data/df_prep_2024-12-09_08-23-45_627733.pq"
+# PATH_DATA = "data/df_prep_2024-12-09_08-23-45_627733.pq"
 PATH_DATA = "data/df_index_2025_v1.pq"
-EMBEDDING_MODEL = "google-4"
+EMBEDDING_MODEL = "gte"
 
 
 @timeit
@@ -108,7 +111,7 @@ def load_data(n_samples=N_SAMPLES):
 
 
 @timeit
-def create_index(df, embeddings: HuggingFaceEmbeddings):
+def create_index(df, embeddings: HuggingFaceEmbeddings, index_type="ip"):
     print("Creating index...")
 
     # Loading docs
@@ -130,7 +133,11 @@ def create_index(df, embeddings: HuggingFaceEmbeddings):
     batch_size = INDEX_BATCH_SIZE
     for i in tqdm(range(0, len_docs, batch_size)):
         batch = docs[i : i + batch_size]
-        index = faiss.IndexFlatL2(len(embeddings.embed_query("hi man")))
+        d = len(embeddings.embed_query("hi man"))
+        if index_type == "ip":
+            index = faiss.IndexFlatIP(d)
+        else:
+            index = faiss.IndexFlatL2()
         vector_store = FAISS(
             embedding_function=embeddings,
             index=index,
@@ -142,13 +149,62 @@ def create_index(df, embeddings: HuggingFaceEmbeddings):
     print("Index creation finished!")
 
 
+# Function to normalize embeddings
+def normalize(vectors):
+    return vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
+
+
+@timeit
+def normalize_index(embeddings: HuggingFaceEmbeddings):
+    print("Normalizing index...")
+    # Os embeddings da google e do gte já são normalizados
+    folders = os.listdir(PATH_INDEX)
+
+    vector_store = None
+    i = 0
+    for f in tqdm(folders, total=len(folders)):
+        print(f"{i=}")
+        if i >= MAX_VECTOR_STORES:
+            break
+        vector_store_l2 = FAISS.load_local(
+            f"{PATH_INDEX}/{f}",
+            embeddings,
+            allow_dangerous_deserialization=True,
+        )
+
+        index: faiss.Index = vector_store_l2.index
+        vectors = index.reconstruct_n(0, index.ntotal)
+
+        index_ip = faiss.IndexFlatIP(index.d)
+        index_ip.add(vectors)
+
+        vector_store_ip = FAISS(
+            embedding_function=embeddings,
+            index=index_ip,
+            docstore=InMemoryDocstore(vector_store_l2.docstore._dict),
+            index_to_docstore_id=vector_store_l2.index_to_docstore_id,
+        )
+
+        assert vector_store_ip.index.d == vector_store_l2.index.d
+        assert vector_store_ip.index.ntotal == vector_store_l2.index.ntotal
+        assert vector_store_ip.docstore._dict == vector_store_l2.docstore._dict
+        assert (
+            vector_store_ip.index_to_docstore_id == vector_store_l2.index_to_docstore_id
+        )
+        assert (
+            vector_store_ip.index.reconstruct_n(0, 1)[0]
+            == vector_store_l2.index.reconstruct_n(0, 1)[0]
+        ).all()
+        norm_ = np.linalg.norm(vector_store_ip.index.reconstruct_n(0, 1)[0])
+        assert abs(norm_ - 1) < 1e-4
+        vector_store_ip.save_local(PATH_INDEX + f"_ip/{i}")
+        i += 1
+    print("Index normalized.")
+
+
 @timeit
 def load_index(embeddings: HuggingFaceEmbeddings):
     print("Loading index...")
-    # vector_store = FAISS.load_local(
-    #     PATH_INDEX, embeddings, allow_dangerous_deserialization=True
-    # )
-
     folders = os.listdir(PATH_INDEX)
 
     vector_store = None
@@ -181,9 +237,12 @@ def query_index(vector_store: FAISS, query, filter: dict = {}):
     query = QUERY_PREFIX + query
     results = vector_store.similarity_search_with_score(
         query,
-        k=N_RESPONSES,
+        k=FETCH_K,
+        fetch_k=FETCH_K,
         filter=filter,
     )
+    print(f"{len(results)=}/{FETCH_K=} {N_RESPONSES=}")
+    results = results[:N_RESPONSES]
     context = ""
     for i, (res, score) in enumerate(results):
         print_ = (
@@ -192,7 +251,8 @@ def query_index(vector_store: FAISS, query, filter: dict = {}):
             f"Região:{res.metadata['regiao']}; Estado:{res.metadata['sigla_estado']}\n"
             f"Nota: {res.metadata['nota_avaliacao']}\nAvaliação: {res.page_content}\n\n"
         )
-        print(res.metadata, "\n", print_)
+        # print(res.metadata, "\n", print_)
+        print(print_)
         context += print_
     return results, context
 
@@ -273,6 +333,9 @@ if __name__ == "__main__":
         embeddings, _ = load_embedding(EMBEDDING_MODEL, task_type="retrieval_document")
         df_sample = load_data(N_SAMPLES)
         create_index(df_sample, embeddings)
+    elif NORMALIZE_INDEX:
+        embeddings, _ = load_embedding(EMBEDDING_MODEL, task_type="retrieval_document")
+        normalize_index(embeddings)
     else:
         embeddings, _ = load_embedding(EMBEDDING_MODEL, task_type="retrieval_query")
         vector_store = load_index(embeddings)
