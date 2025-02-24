@@ -20,7 +20,7 @@ import re
 
 from llms.utils import timeit
 from llms.models import load_model, load_embedding, query_model, query_model_async
-from llms.prompts import PROMPT, PROMPT_QUERY
+from llms.prompts import PROMPT, PROMPT_QUERY, format_context
 
 # logging.basicConfig(level=logging.DEBUG)
 # set_debug(True)
@@ -40,6 +40,7 @@ MAX_VECTOR_STORES = 1000
 PATH_DATA = "data/df_index_2025_v1.pq"
 EMBEDDING_MODEL = "gte"
 RAG_ALIAS = "google-ip"
+INDEX_SIZE = 222923
 
 rags = {
     "gte-old": ["gte", "data/faiss_index_full_v2"],
@@ -207,6 +208,7 @@ def query_index(vector_store: FAISS, query, filter: dict = {}):
     i = 0
     while True:
         fetch_k = FETCH_K * (10**i)
+        fetch_k = min(fetch_k, INDEX_SIZE)
         print(f"Query with increasing fetch_k: {i=} {fetch_k=}")
         results = vector_store.similarity_search_with_score(
             query,
@@ -218,7 +220,7 @@ def query_index(vector_store: FAISS, query, filter: dict = {}):
         if len(results) >= N_RESPONSES:
             print("Results sufficient.")
             break
-        elif i >= 5:
+        elif fetch_k >= INDEX_SIZE or i >= 3:
             print("Max queries reached!")
             break
         i += 1
@@ -227,15 +229,10 @@ def query_index(vector_store: FAISS, query, filter: dict = {}):
     results = sorted(results, key=lambda x: x[1])[:N_RESPONSES]
     context = ""
     for i, (res, score) in enumerate(results):
-        print_ = (
-            f" - Avaliação {i+1}, Similaridade: {score:0.3f}\n"
-            f"Hotel: {res.metadata['nome']}, {res.metadata['estrelas']} Estrelas. "
-            f"Região:{res.metadata['regiao']}; Estado:{res.metadata['sigla_estado']}\n"
-            f"Nota: {res.metadata['nota_avaliacao']}\nAvaliação: {res.page_content}\n\n"
-        )
-        # print(res.metadata, "\n", print_)
-        print(print_)
-        context += print_
+        context_i = format_context(i, res, score)
+        # print(res.metadata, "\n", context_i)
+        print(context_i)
+        context += context_i
     return results, context
 
 

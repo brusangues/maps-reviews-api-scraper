@@ -31,11 +31,10 @@ Os metadados nos quais esses operadores podem ser aplicados são os seguintes:
 "cidade": Nome da cidade onde o hotel está localizado. Exemplos ["São Paulo", "Rio de Janeiro"]
 "sigla_estado": Código de duas letras representando o estado brasileiro onde o hotel está localizado em caixa alta. ["RJ", "RO", "BA", "PE", "MG", "SP", "SC", "AM", "CE", "PR", "PA", "AL", "GO", "RS", "RN", "DF", "RR", "MS", "TO", "MT", "PB", "ES", "MA"]
 "estado": Nome completo do estado onde o hotel está localizado em caixa alta. Exemplos ["SÃO PAULO", "RIO DE JANEIRO"]
-"capital_estado": Nome da capital do estado onde o hotel está localizado em caixa alta. Exemplos ["SÃO PAULO", "RIO DE JANEIRO"]
 "regiao": Região geográfica do Brasil onde o hotel está localizado. Valores possíveis: ["SUDESTE", "NORTE", "NORDESTE", "SUL", "CENTRO-OESTE"].
 "endereco": Endereço completo do hotel, incluindo rua, número, bairro, cidade e estado.
 "classificacao_geral": Nota geral do hotel baseada nas avaliações dos usuários, variando de 0.0 a 5.0.
-"quantidade_avaliacoes": Número total de avaliações recebidas pelo hotel.
+"quantidade_avaliacoes": Número total de avaliações recebidas pelo hotel. Pode ser utilizado para filtrar hotéis grandes (>1000 avaliações).
 "nota_avaliacao": Nota específica da avaliação, variando de 1 a 5.
 "curtidas_avaliacao": Número de curtidas recebidas por uma avaliação.
 "usuario_guia_local": Indica se o usuário que fez a avaliação é um Guia Local do Google Maps (1 para sim, 0 para não).
@@ -54,6 +53,32 @@ PERGUNTA: Qual o melhor hotel no estado de SP?
 RESPOSTA: ```json {"sigla_estado": {"$eq": "SP"}} ``` Qual o melhor hotel?\n
 PERGUNTA: Quero um hotel de 4 estrelas pé na areia.
 RESPOSTA: ```json {"estrelas": {"$eq": 4}} ``` Quero um hotel pé na areia.\n
+PERGUNTA: Qual hotel tem o melhor café da manhã na cidade de Amparo, no estado de SP?
+RESPOSTA: ```json {"cidade": {"$eq": "Amparo"}, "sigla_estado": {"$eq": "SP"}} ``` Qual hotel tem o melhor café da manhã?'\n
 FIM DOS EXEMPLOS!!!\n
 Não explique a resposta e responda apenas com o JSON seguido da pergunta reformulada.\n
 """
+
+
+def format_context(i, res, score):
+    meta = res.metadata
+    text = res.page_content
+    review_i = i + 1
+    outras_notas = ""
+    nomes_outras_notas = {
+        "nota_quartos": "Quartos",
+        "nota_localizacao": "Localização",
+        "nota_servico": "Serviço",
+    }
+    for key, name in nomes_outras_notas.items():
+        if meta[key] == meta[key]:  # Checando se é NaN
+            outras_notas += f"; Nota {name}:{int(meta[key])}"
+    context = (
+        f" - Avaliação {review_i}, Similaridade: {score:0.3f}\n"
+        f"Hotel: {meta['nome']}, {int(meta['estrelas'])} Estrelas.\n"
+        f"Região:{meta['regiao']}; Estado:{meta['estado']}; Cidade:{meta['cidade']}\n"
+        f"Tipo:{meta['subcategoria']}; Classificação:{meta['classificacao_geral']}; Quantidade Avaliações:{int(meta['quantidade_avaliacoes'])}\n"
+        f"Nota:{int(meta['nota_avaliacao'])}; Curtidas:{int(meta['curtidas_avaliacao'])}{outras_notas}\n"
+        f"Avaliação: {text}\n\n"
+    )
+    return context

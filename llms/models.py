@@ -111,7 +111,8 @@ def load_embedding(model_alias="google-4", task_type="retrieval_query"):
 @timeit
 def query_model(llm: HuggingFacePipeline, prompt: str):
     print("query_model...")
-    print(f"{len(prompt)=} {prompt=}")
+    print(f"{len(prompt)=}")
+    # print(f"{len(prompt)=} {prompt=}")
     # Calculate the number of input tokens using the model tokenizer
     if llm.pipeline is None:
         num_input_tokens = len(prompt.split())
