@@ -59,11 +59,40 @@ FIM DOS EXEMPLOS!!!\n
 Não explique a resposta e responda apenas com o JSON seguido da pergunta reformulada.\n
 """
 
+PROMPT_SUMMARY = """
+Você é um assistente de sumarização de hotéis em português.
+Utilize os seguintes trechos de CONTEXTO recuperado de avaliações de hotéis para escrever o RESUMO.
+Siga as INSTRUÇÕES do usuário para escrever um resumo detalhado do que se pede.\n
+CONTEXTO:\n{context}\n
+INSTRUÇÕES:\n{query}\n
+RESUMO:"""
 
-def format_context(i, res, score):
+topics = [
+    "Infraestrutura e Acomodações – Conforto, limpeza, tecnologia, lazer, estacionamento.",
+    "Atendimento e Serviço – Cordialidade, eficiência, limpeza, concierge, check-in ágil.",
+    "Localização e Acessibilidade – Proximidade, transporte, segurança, acessibilidade.",
+    "Alimentação e Bebidas – Café da manhã, restaurante, serviço de quarto, qualidade.",
+    "Experiência e Entretenimento – Lazer, eventos, recreação, passeios, parcerias.",
+    "Custo-benefício e Políticas – Preço justo, flexibilidade, transparência, fidelidade.",
+]
+
+
+def format_context(i, res, score=None, include_hotel_context=True):
     meta = res.metadata
     text = res.page_content
     review_i = i + 1
+
+    score_context = f", Similaridade: {score:0.3f}" if score is not None else ""
+
+    if include_hotel_context:
+        hotel_context = (
+            f"Hotel: {meta['nome']}, {int(meta['estrelas'])} Estrelas.\n"
+            f"Região:{meta['regiao']}; Estado:{meta['estado']}; Cidade:{meta['cidade']}\n"
+            f"Tipo:{meta['subcategoria']}; Classificação:{meta['classificacao_geral']}; Quantidade Avaliações:{int(meta['quantidade_avaliacoes'])}\n"
+        )
+    else:
+        hotel_context = ""
+
     outras_notas = ""
     nomes_outras_notas = {
         "nota_quartos": "Quartos",
@@ -73,12 +102,27 @@ def format_context(i, res, score):
     for key, name in nomes_outras_notas.items():
         if meta[key] == meta[key]:  # Checando se é NaN
             outras_notas += f"; Nota {name}:{int(meta[key])}"
+
+    local_guide_context = (
+        "; Usuário é guia local"
+        if meta["usuario_guia_local"]
+        else "; Usuário não é guia local"
+    )
+
     context = (
-        f" - Avaliação {review_i}, Similaridade: {score:0.3f}\n"
-        f"Hotel: {meta['nome']}, {int(meta['estrelas'])} Estrelas.\n"
-        f"Região:{meta['regiao']}; Estado:{meta['estado']}; Cidade:{meta['cidade']}\n"
-        f"Tipo:{meta['subcategoria']}; Classificação:{meta['classificacao_geral']}; Quantidade Avaliações:{int(meta['quantidade_avaliacoes'])}\n"
-        f"Nota:{int(meta['nota_avaliacao'])}; Curtidas:{int(meta['curtidas_avaliacao'])}{outras_notas}\n"
+        f" - Avaliação {review_i}{score_context}\n"
+        f"{hotel_context}"
+        f"Nota:{int(meta['nota_avaliacao'])}; Curtidas:{int(meta['curtidas_avaliacao'])}"
+        f"{local_guide_context}{outras_notas}\n"
         f"Avaliação: {text}\n\n"
     )
     return context
+
+
+def prompt_summary(hotel: str, topic: str, positive=True):
+    if positive:
+        prompt = "Quais os aspectos positivos (avaliações com nota 3 ou mais) "
+    else:
+        prompt = "Quais os aspectos negativos (avaliações com nota 3 ou menos) "
+    prompt += f'do hotel "{hotel}" no quesito "{topic}"'
+    return prompt

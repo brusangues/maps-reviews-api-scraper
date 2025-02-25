@@ -34,6 +34,7 @@ from llms.rag import load_rag, query_index, query_make_filter, PROMPT
 LLM = None
 INDEX = None
 FILTER = {}
+MESSAGE_LIMIT = 4095
 
 
 # Commands
@@ -133,7 +134,10 @@ async def handle_response(update: Update, text: str) -> str:
             f"Filtro criado dinamicamente: {filter}\nQuery atualizada: {query_updated}"
         )
         results, context = query_index(INDEX, query_updated, filter)
-        await update.message.reply_text(f"Resultado da busca no índice:\n{context}")
+        response = f"Resultado da busca no índice:\n{context}"
+        print(f"Response length: {len(response)}/{MESSAGE_LIMIT}")
+        response = response[:MESSAGE_LIMIT]
+        await update.message.reply_text(response)
         prompt = PROMPT.format(
             context=context,
             question=text,
@@ -141,7 +145,10 @@ async def handle_response(update: Update, text: str) -> str:
         return "Resposta final:\n" + query_model(LLM, prompt)
     elif LLM is not None and INDEX is not None:
         results, context = query_index(INDEX, text, FILTER)
-        await update.message.reply_text(f"Resultado da busca no índice:\n{context}")
+        response = f"Resultado da busca no índice:\n{context}"
+        print(f"Response length: {len(response)}/{MESSAGE_LIMIT}")
+        response = response[:MESSAGE_LIMIT]
+        await update.message.reply_text(response)
         prompt = PROMPT.format(
             context=context,
             question=text,
@@ -167,6 +174,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"User ({update.message.chat.id}) in {message_type}: {text}")
 
         response = await handle_response(update, text)
+        print(f"Response length: {len(response)}/{MESSAGE_LIMIT}")
+        response = response[:MESSAGE_LIMIT]
 
         print(f"Bot: {response}")
         await update.message.reply_text(response)

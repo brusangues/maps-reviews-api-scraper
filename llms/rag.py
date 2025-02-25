@@ -202,7 +202,9 @@ def load_index(embeddings: HuggingFaceEmbeddings, path_index: str = PATH_INDEX):
 
 
 @timeit
-def query_index(vector_store: FAISS, query, filter: dict = {}):
+def query_index(
+    vector_store: FAISS, query, filter: dict = {}, n_responses: int = N_RESPONSES
+):
     print("Querying index...")
     query = QUERY_PREFIX + query
     i = 0
@@ -216,8 +218,8 @@ def query_index(vector_store: FAISS, query, filter: dict = {}):
             fetch_k=fetch_k,
             filter=filter,
         )
-        print(f"{len(results)=}/{fetch_k=} {N_RESPONSES=}")
-        if len(results) >= N_RESPONSES:
+        print(f"{len(results)=}/{fetch_k=} {n_responses=}")
+        if len(results) >= n_responses:
             print("Results sufficient.")
             break
         elif fetch_k >= INDEX_SIZE or i >= 3:
@@ -226,7 +228,7 @@ def query_index(vector_store: FAISS, query, filter: dict = {}):
         i += 1
 
     # Construindo contexto
-    results = sorted(results, key=lambda x: x[1])[:N_RESPONSES]
+    results = sorted(results, key=lambda x: x[1])[:n_responses]
     context = ""
     for i, (res, score) in enumerate(results):
         context_i = format_context(i, res, score)
