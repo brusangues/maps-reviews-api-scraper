@@ -13,6 +13,7 @@ langchain-community
 langchain-text-splitters
 langchain-huggingface
 langchain-google-genai
+langchain-openai
 langgraph
 huggingface_hub[cli]
 
@@ -22,6 +23,8 @@ transformers
 bitsandbytes
 torch
 accelerate
+
+azure-ai-inference
 
 # pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
