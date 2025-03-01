@@ -1,5 +1,6 @@
 import time
 import re
+import pandas as pd
 
 ### **Modelo de Prompt de Avaliação baseado no G-Eval**
 
@@ -100,6 +101,7 @@ evaluation_metrics = {
 def g_eval_scores(summaries: list, document: str, llm, sleep=1):
     print("g_eval_scores...")
     results = []
+    scores = []
 
     for i, summary in enumerate(summaries):
         print(f"Evaluating summary {i}")
@@ -129,6 +131,9 @@ def g_eval_scores(summaries: list, document: str, llm, sleep=1):
                 "response": response,
             }
             results.append(data)
+            scores.append(score)
             print(f"Sleeping {sleep} seconds...")
             time.sleep(sleep)
-    return results
+    score_final = pd.Series(scores).mean()
+    print(f"{score_final=} {scores=}")
+    return results, score_final

@@ -4,6 +4,7 @@ unidecode
 
 jupyter
 pandas
+matplotlib
 numpy
 pyarrow
 tqdm

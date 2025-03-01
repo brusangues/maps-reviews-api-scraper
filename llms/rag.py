@@ -230,8 +230,8 @@ def query_index(
     # Construindo contexto
     results = sorted(results, key=lambda x: x[1])[:n_responses]
     context = ""
-    for i, (res, score) in enumerate(results):
-        context_i = format_context(i, res, score)
+    for i, (doc, score) in enumerate(results):
+        context_i = format_context(i, doc, score)
         # print(res.metadata, "\n", context_i)
         print(context_i)
         context += context_i

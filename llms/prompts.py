@@ -59,23 +59,6 @@ FIM DOS EXEMPLOS!!!\n
 Não explique a resposta e responda apenas com o JSON seguido da pergunta reformulada.\n
 """
 
-PROMPT_SUMMARY = """
-Você é um assistente de sumarização de hotéis em português.
-Utilize os seguintes trechos de CONTEXTO recuperado de avaliações de hotéis para escrever o RESUMO.
-Siga as INSTRUÇÕES do usuário para escrever um resumo detalhado do que se pede.\n
-CONTEXTO:\n{context}\n
-INSTRUÇÕES:\n{query}\n
-RESUMO:"""
-
-topics = [
-    "Infraestrutura e Acomodações – Conforto, limpeza, tecnologia, lazer, estacionamento.",
-    "Atendimento e Serviço – Cordialidade, eficiência, limpeza, concierge, check-in ágil.",
-    "Localização e Acessibilidade – Proximidade, transporte, segurança, acessibilidade.",
-    "Alimentação e Bebidas – Café da manhã, restaurante, serviço de quarto, qualidade.",
-    "Experiência e Entretenimento – Lazer, eventos, recreação, passeios, parcerias.",
-    "Custo-benefício e Políticas – Preço justo, flexibilidade, transparência, fidelidade.",
-]
-
 
 def format_context(i, res, score=None, include_hotel_context=True):
     meta = res.metadata
@@ -117,12 +100,3 @@ def format_context(i, res, score=None, include_hotel_context=True):
         f"Avaliação: {text}\n\n"
     )
     return context
-
-
-def prompt_summary(hotel: str, topic: str, positive=True):
-    if positive:
-        prompt = "Quais os aspectos positivos (avaliações com nota 3 ou mais) "
-    else:
-        prompt = "Quais os aspectos negativos (avaliações com nota 3 ou menos) "
-    prompt += f'do hotel "{hotel}" no quesito "{topic}"'
-    return prompt
