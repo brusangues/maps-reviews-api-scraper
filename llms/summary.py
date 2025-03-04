@@ -1,6 +1,6 @@
 import pandas as pd
 from langchain_core.documents import Document
-from llms.rag import load_data
+from llms.rag import load_data, query_index
 from llms.prompts import format_context
 
 PROMPT_SUMMARY = """
@@ -50,12 +50,15 @@ def make_docs(df_hotel) -> list[tuple[Document, None]]:
 
 
 def make_context_summary(docs) -> str:
+    n_docs = len(docs)
     meta = docs[0][0].__dict__["metadata"]
     context = (
+        "Informações gerais sobre o hotel:"
         f"Hotel: {meta['nome']}, {int(meta['estrelas'])} Estrelas.\n"
         f"Região:{meta['regiao']}; Estado:{meta['estado']}; Cidade:{meta['cidade']}\n"
         f"Tipo:{meta['subcategoria']}; Classificação:{meta['classificacao_geral']}; Quantidade Avaliações:{int(meta['quantidade_avaliacoes'])}\n"
         "\n"
+        f"Top {n_docs} avaliações do hotel mais semelhantes à pergunta:\n"
     )
 
     for i, (doc, score) in enumerate(docs):
@@ -75,20 +78,72 @@ def make_query_summary_full(hotel: str, topics: list) -> str:
 
 def make_query_summary_topic(hotel: str, topic: str, positive=True) -> str:
     if positive:
-        query = "Quais os aspectos positivos (avaliações com nota 3 ou mais) "
+        query = "Quais os aspectos positivos "
     else:
-        query = "Quais os aspectos negativos (avaliações com nota 3 ou menos) "
+        query = "Quais os aspectos negativos "
     query += f'do hotel "{hotel}" no quesito "{topic}"?'
     return query
 
 
-def make_prompt_summary_full(hotel_name: str, df: pd.DataFrame):
+def make_prompt_summary_full(hotel_name: str, df: pd.DataFrame, topics: list = TOPICS):
     docs = make_docs(df[df.nome == hotel_name])
     context = make_context_summary(docs)
-    query = make_query_summary_full(hotel_name, TOPICS)
+    query = make_query_summary_full(hotel_name, topics)
     prompt = PROMPT_SUMMARY.format(context=context, query=query)
     print(prompt)
     return prompt, context
+
+
+def make_prompt_summary_full_v2(
+    hotel_name: str,
+    vector_store,
+    n_responses: int = 1000,
+    topics: list = TOPICS,
+):
+    filter_hotel = {"nome": {"$eq": hotel_name}}
+    query = make_query_summary_full(hotel_name, topics)
+    docs, _ = query_index(
+        query=query,
+        vector_store=vector_store,
+        filter=filter_hotel,
+        n_responses=n_responses,
+    )
+    context = make_context_summary(docs)
+    prompt = PROMPT_SUMMARY.format(context=context, query=query)
+    return prompt, context
+
+
+def make_prompts_summary_topic(
+    hotel_name: str,
+    vector_store,
+    n_responses: int = 100,
+    topics: list = TOPICS,
+):
+    filter_hotel = {"nome": {"$eq": hotel_name}}
+    prompts = []
+    contexts = []
+    for i, topic in enumerate(topics):
+        for positive in [True, False]:
+            print(f"{hotel_name=} {i=} {topic=} {positive=}")
+            if positive:
+                filter_review = {"nota_avaliacao": {"$gte": 3}}
+            else:
+                filter_review = {"nota_avaliacao": {"$lte": 3}}
+            filter_final = {**filter_hotel, **filter_review}
+            query = make_query_summary_topic(
+                hotel=hotel_name, topic=topic, positive=positive
+            )
+            docs, _ = query_index(
+                query=query,
+                vector_store=vector_store,
+                filter=filter_final,
+                n_responses=n_responses,
+            )
+            context = make_context_summary(docs)
+            prompt = PROMPT_SUMMARY.format(context=context, query=query)
+            contexts.append(context)
+            prompts.append(prompt)
+    return prompts, contexts
 
 
 def make_summaries():
