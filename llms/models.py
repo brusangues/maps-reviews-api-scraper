@@ -28,7 +28,7 @@ models_text = {
     "gemini-1.5-flash":      ("google", "gemini-1.5-flash"),
     "gemini-1.5-flash-8b":   ("google", "gemini-1.5-flash-8b"),
     "gemini-1.5-pro":        ("google", "gemini-1.5-pro"),
-    "gemini-2.0-pro":        ("google", "gemini-2.0-pro-exp-02-05"),
+    "gemini-2.0-pro":        ("google", "gemini-2.0-pro-exp"),
     "gemini-2.0-flash-thinking": ("google", "gemini-2.0-flash-thinking-exp"),
 
     # "gemini-2.0-pro": ("open_router", "google/gemini-2.0-pro-exp-02-05:free", "https://openrouter.ai/api/v1"),
@@ -42,17 +42,16 @@ models_text = {
     "gh-r1":       ("github", "DeepSeek-R1", "https://models.inference.ai.azure.com"),
     "gh-llama70b": ("github", "Llama-3.3-70B-Instruct", "https://models.inference.ai.azure.com"),
 }
-# fmt: on
 models_embedding = {
-    "gte": "Alibaba-NLP/gte-multilingual-base",
-    "modernbert": "nomic-ai/modernbert-embed-base",
-    "e5": "intfloat/multilingual-e5-large",
-    "e5-instruct": "intfloat/multilingual-e5-large-instruct",
-    "arctic": "Snowflake/snowflake-arctic-embed-l-v2.0",
-    "google-4": "models/text-embedding-004",
-    # "google-5": "models/text-embedding-005",
-    # "google-m2": "models/text-multilingual-embedding-002",
+    "gte":         ("local", "Alibaba-NLP/gte-multilingual-base"),
+    "modernbert":  ("local", "nomic-ai/modernbert-embed-base"),
+    "e5":          ("local", "intfloat/multilingual-e5-large"),
+    "e5-instruct": ("local", "intfloat/multilingual-e5-large-instruct"),
+    "arctic":      ("local", "Snowflake/snowflake-arctic-embed-l-v2.0"),
+    "google-4":    ("google", "models/text-embedding-004"),
+    "gemini":      ("google", "models/gemini-embedding-exp-03-07"),
 }
+# fmt: on
 MAX_NEW_TOKENS = 3000
 
 
@@ -132,9 +131,12 @@ def load_model(model_alias="gemini-2.0-flash", max_new_tokens=MAX_NEW_TOKENS):
 @timeit
 def load_embedding(model_alias="google-4", task_type="retrieval_query"):
     print("load_embedding...")
-    model_name = models_embedding.get(model_alias, models_embedding["google-4"])
-    print(f"{model_alias=} {model_name=} {task_type=}")
-    if model_alias.startswith("google"):
+    model_data = models_embedding.get(model_alias, models_embedding["google-4"])
+    print(f"{model_alias=} {model_data=} {task_type=}")
+    provider = model_data[0]
+    model_name = model_data[1]
+
+    if provider == "google":
         print("Loading GoogleGenerativeAIEmbeddings model...")
         embeddings = GoogleGenerativeAIEmbeddings(
             model=model_name,
