@@ -262,14 +262,14 @@ def query_with_user_input(vector_store: FAISS, llm: HuggingFacePipeline):
             question=query,
         )
         # response = asyncio.run(query_model_async(llm, prompt))
-        response = query_model(llm, prompt)
+        response = query_model(llm, prompt)[0]
         # print(response)
         print("\n", "=" * 100, "\n")
 
 
 def query_make_filter(llm: HuggingFacePipeline, query: str):
     prompt_query = PROMPT_QUERY + f"PERGUNTA: {query}\nRESPOSTA: "
-    filter_raw = query_model(llm, prompt_query)
+    filter_raw = query_model(llm, prompt_query)[0]
     filter = {}
     query_updated = None
     try:
@@ -292,7 +292,7 @@ def rag_loop(vector_store: FAISS, llm: HuggingFacePipeline, query: str):
         context=context,
         question=query,
     )
-    response = query_model(llm, prompt)
+    response = query_model(llm, prompt)[0]
     return response
 
 

@@ -142,7 +142,7 @@ async def handle_response(update: Update, text: str) -> str:
             context=context,
             question=text,
         )
-        return "Resposta final:\n" + query_model(LLM, prompt)
+        return "Resposta final:\n" + query_model(LLM, prompt)[0]
     elif LLM is not None and INDEX is not None:
         results, context = query_index(INDEX, text, FILTER)
         response = f"Resultado da busca no índice:\n{context}"
@@ -153,9 +153,9 @@ async def handle_response(update: Update, text: str) -> str:
             context=context,
             question=text,
         )
-        return "Resposta final:\n" + query_model(LLM, prompt)
+        return "Resposta final:\n" + query_model(LLM, prompt)[0]
     elif LLM is not None:
-        return query_model(LLM, text)
+        return query_model(LLM, text)[0]
     return (
         "Nenhum modelo está carregado. "
         "Use o comando /load para carregar um modelo de linguagem. "

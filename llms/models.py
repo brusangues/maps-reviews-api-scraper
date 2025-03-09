@@ -65,7 +65,13 @@ class GenericHuggingFacePipeline:
         results = []
         for prompt in prompts:
             response = self.model.invoke(prompt)
-            generation = Generation(text=response.content)
+            metadata = {}
+            try:
+                metadata = response.usage_metadata
+                metadata = metadata | response.response_metadata
+            except:
+                pass
+            generation = Generation(text=response.content, generation_info=metadata)
             results.append([generation])
         return LLMResult(generations=results)
 
@@ -156,9 +162,11 @@ def query_model(llm: HuggingFacePipeline, prompt: str):
     print(f"{num_input_tokens=}")
     llmresult = llm.generate([prompt])
     response = llmresult.generations[0][0].text
+    info = llmresult.generations[0][0].generation_info
     print(f"{len(response)=}")
     print(f"{response=}")
-    return response
+    print(f"{info=}")
+    return response, info
 
 
 @timeit
