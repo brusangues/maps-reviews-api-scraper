@@ -1,6 +1,9 @@
 import time
 import re
 import pandas as pd
+from tqdm import tqdm
+
+from llms.models import query_model
 
 ### **Modelo de Prompt de Avaliação baseado no G-Eval**
 
@@ -114,8 +117,7 @@ def g_eval_scores(summaries: list, document: str, llm, sleep=1):
                 document=document,
                 summary=summary,
             )
-            response = llm.generate([prompt]).generations[0][0].text
-            print(f"{response=}")
+            response, info = query_model(llm, prompt)
             try:
                 # score = int(response.strip())
                 score = int(re.search(r"(\d+)", response).group(1))
@@ -129,6 +131,7 @@ def g_eval_scores(summaries: list, document: str, llm, sleep=1):
                 "score": score,
                 "prompt": prompt,
                 "response": response,
+                "info": info,
             }
             results.append(data)
             scores.append(score)
