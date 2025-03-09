@@ -28,9 +28,11 @@ models_text = {
     "gemini-1.5-flash":      ("google", "gemini-1.5-flash"),
     "gemini-1.5-flash-8b":   ("google", "gemini-1.5-flash-8b"),
     "gemini-1.5-pro":        ("google", "gemini-1.5-pro"),
+    "gemini-2.0-pro":        ("google", "gemini-2.0-pro-exp-02-05"),
+    "gemini-2.0-flash-thinking": ("google", "gemini-2.0-flash-thinking-exp"),
 
-    "gemini-2.0-pro": ("open_router", "google/gemini-2.0-pro-exp-02-05:free", "https://openrouter.ai/api/v1"),
-    "gemini-2.0-flash-thinking": ("open_router", "google/gemini-2.0-flash-thinking-exp:free", "https://openrouter.ai/api/v1"),
+    # "gemini-2.0-pro": ("open_router", "google/gemini-2.0-pro-exp-02-05:free", "https://openrouter.ai/api/v1"),
+    # "gemini-2.0-flash-thinking": ("open_router", "google/gemini-2.0-flash-thinking-exp:free", "https://openrouter.ai/api/v1"),
     "or-llama70b":    ("open_router", "meta-llama/llama-3.3-70b-instruct:free", "https://openrouter.ai/api/v1"),
     "or-r1":          ("open_router", "deepseek/deepseek-r1:free", "https://openrouter.ai/api/v1"),
     "qwen2.5":        ("open_router", "qwen/qwen2.5-vl-72b-instruct:free", "https://openrouter.ai/api/v1"),
