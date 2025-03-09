@@ -1,5 +1,6 @@
 import pandas as pd
 from langchain_core.documents import Document
+from langchain_community.vectorstores import FAISS
 from llms.rag import load_data, query_index
 from llms.prompts import format_context
 
@@ -10,7 +11,6 @@ Siga as INSTRUÇÕES do usuário para escrever um resumo detalhado do que se ped
 CONTEXTO:\n{context}\n
 INSTRUÇÕES:\n{query}\n
 RESUMO:"""
-
 TOPICS = [
     "Infraestrutura e Acomodações – Conforto, limpeza, tecnologia, lazer, estacionamento.",
     "Atendimento e Serviço – Cordialidade, eficiência, limpeza, concierge, check-in ágil.",
@@ -19,10 +19,13 @@ TOPICS = [
     "Experiência e Entretenimento – Lazer, eventos, recreação, passeios, parcerias.",
     "Custo-benefício e Políticas – Preço justo, flexibilidade, transparência, fidelidade.",
 ]
+N_RESPONSES_TOPIC = 100
+N_RESPONSES_FULL = 1_000
+N_DOCS_MAX = 1_000
 
 
-def prep_data(df: pd.DataFrame) -> tuple[list, list]:
-    hotel_review_counts = (
+def prep_data(df: pd.DataFrame) -> pd.DataFrame:
+    hotel_counts = (
         df.groupby("nome")
         .agg(
             count_=("text", "count"),
@@ -31,14 +34,18 @@ def prep_data(df: pd.DataFrame) -> tuple[list, list]:
         .reset_index()
     )
 
-    hotels_small = hotel_review_counts.query("count_>=10 & count_<=1000")
-    hotels_big = hotel_review_counts.query("count_>1000")
+    hotel_counts = hotel_counts.query("count_>=10").copy()
+    hotel_counts.loc[:, "big"] = hotel_counts.count_ >= 1000
 
-    return hotels_small, hotels_big
+    return hotel_counts
 
 
-def make_docs(df_hotel) -> list[tuple[Document, None]]:
+def make_docs(
+    df_hotel: pd.DataFrame, n_docs: int = N_DOCS_MAX
+) -> list[tuple[Document, None]]:
     print("make_docs...")
+    df_hotel = df_hotel.sort_values("data_avaliacao", ascending=False)
+    df_hotel = df_hotel.head(n_docs)
     docs = []
     for i, (id, row) in enumerate(df_hotel.iterrows()):
         metadata = row.to_dict()
@@ -68,6 +75,18 @@ def make_context_summary(docs) -> str:
     return context
 
 
+def make_context_final(hotel: str, responses: list, topics: list = TOPICS) -> str:
+    context = f'A seguir, uma lista de resumos do hotel "{hotel}" por tópico e aspecto:'
+    i = 0
+    for topic in topics:
+        for positive in [True, False]:
+            title = "Aspectos positivos" if positive else "Aspectos negativos"
+            title += f' do hotel no quesito "{topic}":\n'
+            context += title + responses[i] + "\n"
+            i += 1
+    return context
+
+
 def make_query_summary_full(hotel: str, topics: list) -> str:
     query = f'Faça um resumo do hotel "{hotel}" com base nos seguintes tópicos:\n'
     for i, t in enumerate(topics):
@@ -85,19 +104,23 @@ def make_query_summary_topic(hotel: str, topic: str, positive=True) -> str:
     return query
 
 
-def make_prompt_summary_full(hotel_name: str, df: pd.DataFrame, topics: list = TOPICS):
-    docs = make_docs(df[df.nome == hotel_name])
+def make_prompt_summary_full(
+    hotel_name: str,
+    df: pd.DataFrame,
+    n_docs: int = N_DOCS_MAX,
+    topics: list = TOPICS,
+):
+    docs = make_docs(df[df.nome == hotel_name], n_docs=n_docs)
     context = make_context_summary(docs)
     query = make_query_summary_full(hotel_name, topics)
     prompt = PROMPT_SUMMARY.format(context=context, query=query)
-    print(prompt)
     return prompt, context
 
 
 def make_prompt_summary_full_v2(
     hotel_name: str,
-    vector_store,
-    n_responses: int = 1000,
+    vector_store: FAISS,
+    n_responses: int = N_RESPONSES_FULL,
     topics: list = TOPICS,
 ):
     filter_hotel = {"nome": {"$eq": hotel_name}}
@@ -115,8 +138,8 @@ def make_prompt_summary_full_v2(
 
 def make_prompts_summary_topic(
     hotel_name: str,
-    vector_store,
-    n_responses: int = 100,
+    vector_store: FAISS,
+    n_responses: int = N_RESPONSES_TOPIC,
     topics: list = TOPICS,
 ):
     filter_hotel = {"nome": {"$eq": hotel_name}}
@@ -146,8 +169,12 @@ def make_prompts_summary_topic(
     return prompts, contexts
 
 
-def make_summaries():
-    df = load_data()
-    hotels_small, hotels_big = prep_data(df)
-    for hotel_name in hotels_small:
-        prompt = make_prompt_summary_full(hotel_name, df)
+def make_prompt_final(
+    hotel_name: str,
+    responses: list,
+    topics: list = TOPICS,
+):
+    context = make_context_final(hotel=hotel_name, responses=responses, topics=topics)
+    query = make_query_summary_full(hotel_name, topics)
+    prompt = PROMPT_SUMMARY.format(context=context, query=query)
+    return prompt, context
