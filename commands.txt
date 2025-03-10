@@ -3,13 +3,16 @@ conda activate pln
 cd scraper
 python -m app run-async --path ./input/hotels_2025_lt100.csv
 
-# make index
+# make index, telegram bot, summaries
 conda activate cu124
 python -m llms.rag
+python -m llms.run_summary
+python telegram_bot.py
 
 # gpu
 nvidia-smi -l 1
 
+# tempos e anotações
 embeddings=HuggingFaceEmbeddings(model_name='intfloat/multilingual-e5-large-instruct', cache_folder=None, model_kwargs={'trust_remote_code': True}, encode_kwargs={}, multi_process=False, show_progress=False)
 (1000, 22)
 load_data took: 0.7969841957092285
@@ -46,6 +49,17 @@ load_data took: 0.9047060012817383
 Creating index...
 Loading docs...
 Embedding docs...
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 23/23 [41:07<00:00, 107.28s/it]
+[41:07<00:00, 107.28s/it]
 Index creation finished!
 create_index took: 2513.964348554611
+
+embeddings=HuggingFaceEmbeddings(model_name='Alibaba-NLP/gte-multilingual-base', cache_folder=None, model_kwargs={'trust_remote_code': True}, encode_kwargs={}, multi_process=False, show_progress=False)
+Loading data...
+(222923, 22)
+(222923, 22)
+load_data took: 0.41637635231018066
+Creating index...
+Loading docs...
+[4:17:56<00:00, 672.88s/it]
+Index creation finished!
+create_index took: 15495.4209587574
