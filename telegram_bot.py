@@ -24,41 +24,45 @@ import json
 
 from llms.models import (
     load_model,
-    load_embedding,
     query_model,
-    query_model_async,
     models_text,
     models_embedding,
 )
-from llms.rag import load_index, query_index, query_make_filter, PROMPT
+from llms.rag import load_rag, query_index, query_make_filter, PROMPT
 
 
 LLM = None
 INDEX = None
 FILTER = {}
+MESSAGE_LIMIT = 4095
 
 
 # Commands
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("\nstart_command")
     global LLM, INDEX, FILTER
     del LLM, INDEX, FILTER
     torch.cuda.empty_cache()
-    LLM, _, _ = load_model("gemini-2.0-flash")
-    embedding, _ = load_embedding()
-    INDEX = load_index(embedding)
     FILTER = {}
-    print("\nstart_command")
+    LLM, model_name, max_new_tokens = load_model()
+    await update.message.reply_text(
+        f"Modelo carregado: {model_name}\nCom máximo de tokens: {max_new_tokens}"
+    )
+    INDEX, rag_alias, embeddings_name = load_rag("google-ip")
+    await update.message.reply_text(
+        f"Índice carregado: {rag_alias}\nModelo de embedding: {embeddings_name}"
+    )
     await update.message.reply_text("Oi, eu sou um bot. Ambiente inicializado!")
 
 
 async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global LLM, INDEX, FILTER
+    print("\nreset_command")
     del LLM, INDEX, FILTER
     torch.cuda.empty_cache()
     LLM = None
     INDEX = None
     FILTER = {}
-    print("\nreset_command")
     await update.message.reply_text("Ambiente reiniciado!")
 
 
@@ -78,9 +82,8 @@ async def echo_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def load_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global LLM
-    del LLM
-    torch.cuda.empty_cache()
     print("\nload_command")
+    del LLM
     args = update.message.text.replace("/load", "").strip().split()
     print(f"{args=}")
     LLM, model_name, max_new_tokens = load_model(*args)
@@ -91,14 +94,13 @@ async def load_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def rag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global INDEX
-    del INDEX
-    torch.cuda.empty_cache()
     print("\nrag_command")
-    model_alias = update.message.text.replace("/rag", "").strip()
-    print(f"{model_alias=}")
-    embedding, model_name = load_embedding(model_alias)
-    INDEX = load_index(embedding)
-    await update.message.reply_text(f"Modelo carregado: {model_name}")
+    del INDEX
+    rag_alias = update.message.text.replace("/rag", "").strip()
+    INDEX, rag_alias, embeddings_name = load_rag(rag_alias)
+    await update.message.reply_text(
+        f"Índice carregado: {rag_alias}\nModelo de embedding: {embeddings_name}"
+    )
 
 
 async def filter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -128,29 +130,37 @@ async def handle_response(update: Update, text: str) -> str:
         return "Oi de novo, eu sou um bot!"
     elif LLM is not None and INDEX is not None and len(FILTER.keys()) == 0:
         filter, query_updated = query_make_filter(LLM, text)
-        await update.message.reply_text(f"Filtro criado dinamicamente: {filter}")
+        await update.message.reply_text(
+            f"Filtro criado dinamicamente: {filter}\nQuery atualizada: {query_updated}"
+        )
         results, context = query_index(INDEX, query_updated, filter)
-        await update.message.reply_text(f"Resultado da busca no índice:\n{context}")
+        response = f"Resultado da busca no índice:\n{context}"
+        print(f"Response length: {len(response)}/{MESSAGE_LIMIT}")
+        response = response[:MESSAGE_LIMIT]
+        await update.message.reply_text(response)
         prompt = PROMPT.format(
             context=context,
             question=text,
         )
-        return query_model(LLM, prompt)
+        return "Resposta final:\n" + query_model(LLM, prompt)[0]
     elif LLM is not None and INDEX is not None:
         results, context = query_index(INDEX, text, FILTER)
-        await update.message.reply_text(f"Resultado da busca no índice:\n{context}")
+        response = f"Resultado da busca no índice:\n{context}"
+        print(f"Response length: {len(response)}/{MESSAGE_LIMIT}")
+        response = response[:MESSAGE_LIMIT]
+        await update.message.reply_text(response)
         prompt = PROMPT.format(
             context=context,
             question=text,
         )
-        return query_model(LLM, prompt)
+        return "Resposta final:\n" + query_model(LLM, prompt)[0]
     elif LLM is not None:
-        return query_model(LLM, text)
+        return query_model(LLM, text)[0]
     return (
         "Nenhum modelo está carregado. "
         "Use o comando /load para carregar um modelo de linguagem. "
         "Em seguida, use o comando /rag para carregar o índice de avaliações de hotéis. "
-        "Se desejar, use o comando /filter para definir um filtro para as avaliações."
+        "Se desejar, use o comando /filter para definir um filtro para as avaliações manualmente."
     )
 
 
@@ -164,6 +174,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"User ({update.message.chat.id}) in {message_type}: {text}")
 
         response = await handle_response(update, text)
+        print(f"Response length: {len(response)}/{MESSAGE_LIMIT}")
+        response = response[:MESSAGE_LIMIT]
 
         print(f"Bot: {response}")
         await update.message.reply_text(response)

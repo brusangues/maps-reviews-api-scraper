@@ -1,6 +1,7 @@
 from uuid import uuid4
 import faiss
 import pandas as pd
+import numpy as np
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_community.vectorstores import FAISS
@@ -19,6 +20,7 @@ import re
 
 from llms.utils import timeit
 from llms.models import load_model, load_embedding, query_model, query_model_async
+from llms.prompts import PROMPT, PROMPT_QUERY, format_context
 
 # logging.basicConfig(level=logging.DEBUG)
 # set_debug(True)
@@ -26,74 +28,40 @@ from llms.models import load_model, load_embedding, query_model, query_model_asy
 QUERY_PREFIX_E5_INSTRUCT = "Instruct: Given a Portuguese question, retrieve relevant hotel reviews that best answer the question. \nQuery: "
 DOC_PREFIX = ""
 QUERY_PREFIX = ""
-PROMPT = """
-Você é um assistente para tarefas de resposta a perguntas em português.
-Leia a PERGUNTA e use os seguintes trechos de CONTEXTO recuperado de avaliações de hotéis para respondê-la.
-Quanto menor o SCORE, maior é a similaridade da avaliação com a PERGUNTA.
-Se você não souber a resposta, apenas diga que não sabe. 
-Mantenha a resposta concisa.
-Responda depois da tag RESPOSTA.
-\n
-PERGUNTA:\n{question}\n
-CONTEXTO:\n{context}\n
-RESPOSTA:"""
-
-PROMPT_QUERY = """
-Com base na PERGUNTA do usuário, monte um JSON de query de MongoDB com os seguintes operadores:
-$eq (igual a)
-$neq (não igual a)
-$gt (maior que)
-$lt (menor que)
-$gte (maior ou igual a)
-$lte (menor ou igual a)
-$in (pertence à lista)
-$nin (não pertence à lista)
-$and (todas as condições devem corresponder)
-$or (qualquer condição deve corresponder)
-$not (negação da condição)
-Evite de utilizar operadores $and e $or no nível superior de queries sem necessidade.
-
-Os metadados nos quais esses operadores podem ser aplicados são os seguintes:
-"nome": Nome do hotel.
-"estrelas": Número de estrelas do hotel, variando de 0 a 5.
-"cidade": Nome da cidade onde o hotel está localizado. Exemplos ["São Paulo", "Rio de Janeiro"]
-"sigla_estado": Código de duas letras representando o estado brasileiro onde o hotel está localizado em caixa alta. ["RJ", "RO", "BA", "PE", "MG", "SP", "SC", "AM", "CE", "PR", "PA", "AL", "GO", "RS", "RN", "DF", "RR", "MS", "TO", "MT", "PB", "ES", "MA"]
-"estado": Nome completo do estado onde o hotel está localizado em caixa alta. Exemplos ["SÃO PAULO", "RIO DE JANEIRO"]
-"capital_estado": Nome da capital do estado onde o hotel está localizado em caixa alta. Exemplos ["SÃO PAULO", "RIO DE JANEIRO"]
-"regiao": Região geográfica do Brasil onde o hotel está localizado. Valores possíveis: ["SUDESTE", "NORTE", "NORDESTE", "SUL", "CENTRO-OESTE"].
-"endereco": Endereço completo do hotel, incluindo rua, número, bairro, cidade e estado.
-"classificacao_geral": Nota geral do hotel baseada nas avaliações dos usuários, variando de 0.0 a 5.0.
-"quantidade_avaliacoes": Número total de avaliações recebidas pelo hotel.
-"nota_avaliacao": Nota específica da avaliação, variando de 1 a 5.
-"curtidas_avaliacao": Número de curtidas recebidas por uma avaliação.
-"usuario_guia_local": Indica se o usuário que fez a avaliação é um Guia Local do Google Maps (1 para sim, 0 para não).
-"data_avaliacao": Data em que a avaliação foi feita, no formato "YYYY-MM-DD".
-"nota_quartos": Nota dada pelos usuários para os quartos do hotel, variando de 1 a 5.
-"nota_localizacao": Nota dada pelos usuários para a localização do hotel, variando de 1 a 5.
-"nota_servico": Nota dada pelos usuários para o serviço do hotel, variando de 1 a 5.
-"avaliacao_recente": Indica se a avaliação foi feita dentro de 6 meses (1 para sim, 0 para não).
-"numero_palavras_avaliacao": Quantidade de palavras contidas na avaliação do usuário.
-
-Após o JSON, inclua a pergunta reformulada, sem a parte que foi usada para montar a query.
-Siga os seguintes exemplos:
-PERGUNTA: Qual o melhor hotel com 3 estrelas ou mais?
-RESPOSTA: ```json {"estrelas": {"$gte": 3}} ``` Qual o melhor hotel?\n
-PERGUNTA: Qual o melhor hotel no estado de SP?
-RESPOSTA: ```json {"sigla_estado": {"$eq": "SP"}} ``` Qual o melhor hotel?\n
-PERGUNTA: Quero um hotel de 4 estrelas pé na areia.
-RESPOSTA: ```json {"estrelas": {"$eq": 4}} ``` Quero um hotel pé na areia.\n
-FIM DOS EXEMPLOS!!!\n
-Não explique a resposta e responda apenas com o JSON seguido da pergunta reformulada.\n
-"""
 CREATE_INDEX = False
-PATH_INDEX = "data/faiss_index_google_v4"
+NORMALIZE_INDEX = False
+PATH_INDEX = "data/faiss_index_gte_v5"
 INDEX_BATCH_SIZE = 10_000
 N_SAMPLES = None
-N_RESPONSES = 10
+N_RESPONSES = 5
+FETCH_K = 10_000
 MAX_VECTOR_STORES = 1000
-PATH_DATA = "data/df_prep_2024-12-09_08-23-45_627733.pq"
+# PATH_DATA = "data/df_prep_2024-12-09_08-23-45_627733.pq"
 PATH_DATA = "data/df_index_2025_v1.pq"
-EMBEDDING_MODEL = "google-4"
+EMBEDDING_MODEL = "gte"
+RAG_ALIAS = "google-ip"
+INDEX_SIZE = 222923
+
+rags = {
+    "gte-old": ["gte", "data/faiss_index_full_v2"],
+    "gte-l2": ["gte", "data/faiss_index_gte_v5"],
+    "gte-ip": ["gte", "data/faiss_index_gte_v5_ip"],
+    "google-l2": ["google-4", "data/faiss_index_google_v4"],
+    "google-ip": ["google-4", "data/faiss_index_google_v4_ip"],
+}
+
+
+def load_rag(rag_alias: str):
+    print("load_rag...")
+    rag_info = rags.get(rag_alias, rags["google-ip"])
+    embedding_model_alias = rag_info[0]
+    path_index = rag_info[1]
+    embeddings, embeddings_name = load_embedding(
+        embedding_model_alias, task_type="retrieval_query"
+    )
+    print(f"{rag_alias=} {embedding_model_alias=} {embeddings_name=} {path_index=}")
+    vector_store = load_index(embeddings, path_index)
+    return vector_store, rag_alias, embeddings_name
 
 
 @timeit
@@ -108,7 +76,12 @@ def load_data(n_samples=N_SAMPLES):
 
 
 @timeit
-def create_index(df, embeddings: HuggingFaceEmbeddings):
+def create_index(
+    df,
+    embeddings: HuggingFaceEmbeddings,
+    index_type: str = "ip",
+    path_index: str = PATH_INDEX,
+):
     print("Creating index...")
 
     # Loading docs
@@ -130,7 +103,11 @@ def create_index(df, embeddings: HuggingFaceEmbeddings):
     batch_size = INDEX_BATCH_SIZE
     for i in tqdm(range(0, len_docs, batch_size)):
         batch = docs[i : i + batch_size]
-        index = faiss.IndexFlatL2(len(embeddings.embed_query("hi man")))
+        d = len(embeddings.embed_query("hi man"))
+        if index_type == "ip":
+            index = faiss.IndexFlatIP(d)
+        else:
+            index = faiss.IndexFlatL2(d)
         vector_store = FAISS(
             embedding_function=embeddings,
             index=index,
@@ -138,18 +115,67 @@ def create_index(df, embeddings: HuggingFaceEmbeddings):
             index_to_docstore_id={},
         )
         vector_store.add_documents(documents=batch)
-        vector_store.save_local(PATH_INDEX + f"/{i}")
+        vector_store.save_local(path_index + f"/{i}")
     print("Index creation finished!")
 
 
-@timeit
-def load_index(embeddings: HuggingFaceEmbeddings):
-    print("Loading index...")
-    # vector_store = FAISS.load_local(
-    #     PATH_INDEX, embeddings, allow_dangerous_deserialization=True
-    # )
+# Function to normalize embeddings
+def normalize(vectors):
+    return vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
 
-    folders = os.listdir(PATH_INDEX)
+
+@timeit
+def normalize_index(embeddings: HuggingFaceEmbeddings, path_index: str = PATH_INDEX):
+    print("Normalizing index...")
+    # Os embeddings da google e do gte já são normalizados
+    folders = os.listdir(path_index)
+
+    vector_store = None
+    i = 0
+    for f in tqdm(folders, total=len(folders)):
+        print(f"{i=}")
+        if i >= MAX_VECTOR_STORES:
+            break
+        vector_store_l2 = FAISS.load_local(
+            f"{path_index}/{f}",
+            embeddings,
+            allow_dangerous_deserialization=True,
+        )
+
+        index: faiss.Index = vector_store_l2.index
+        vectors = index.reconstruct_n(0, index.ntotal)
+
+        index_ip = faiss.IndexFlatIP(index.d)
+        index_ip.add(vectors)
+
+        vector_store_ip = FAISS(
+            embedding_function=embeddings,
+            index=index_ip,
+            docstore=InMemoryDocstore(vector_store_l2.docstore._dict),
+            index_to_docstore_id=vector_store_l2.index_to_docstore_id,
+        )
+
+        assert vector_store_ip.index.d == vector_store_l2.index.d
+        assert vector_store_ip.index.ntotal == vector_store_l2.index.ntotal
+        assert vector_store_ip.docstore._dict == vector_store_l2.docstore._dict
+        assert (
+            vector_store_ip.index_to_docstore_id == vector_store_l2.index_to_docstore_id
+        )
+        assert (
+            vector_store_ip.index.reconstruct_n(0, 1)[0]
+            == vector_store_l2.index.reconstruct_n(0, 1)[0]
+        ).all()
+        norm_ = np.linalg.norm(vector_store_ip.index.reconstruct_n(0, 1)[0])
+        assert abs(norm_ - 1) < 1e-4
+        vector_store_ip.save_local(path_index + f"_ip/{i}")
+        i += 1
+    print("Index normalized.")
+
+
+@timeit
+def load_index(embeddings: HuggingFaceEmbeddings, path_index: str = PATH_INDEX):
+    print("Loading index...")
+    folders = os.listdir(path_index)
 
     vector_store = None
     i = 0
@@ -158,13 +184,13 @@ def load_index(embeddings: HuggingFaceEmbeddings):
             break
         if vector_store is None:
             vector_store = FAISS.load_local(
-                f"{PATH_INDEX}/{f}",
+                f"{path_index}/{f}",
                 embeddings,
                 allow_dangerous_deserialization=True,
             )
         else:
             vector_i = FAISS.load_local(
-                f"{PATH_INDEX}/{f}",
+                f"{path_index}/{f}",
                 embeddings,
                 allow_dangerous_deserialization=True,
             )
@@ -176,24 +202,39 @@ def load_index(embeddings: HuggingFaceEmbeddings):
 
 
 @timeit
-def query_index(vector_store: FAISS, query, filter: dict = {}):
+def query_index(
+    vector_store: FAISS, query, filter: dict = {}, n_responses: int = N_RESPONSES
+):
     print("Querying index...")
     query = QUERY_PREFIX + query
-    results = vector_store.similarity_search_with_score(
-        query,
-        k=N_RESPONSES,
-        filter=filter,
-    )
-    context = ""
-    for i, (res, score) in enumerate(results):
-        print_ = (
-            f" - Avaliação {i+1}, Similaridade: {score:0.3f}\n"
-            f"Hotel: {res.metadata['nome']}, {res.metadata['estrelas']} Estrelas. "
-            f"Região:{res.metadata['regiao']}; Estado:{res.metadata['sigla_estado']}\n"
-            f"Nota: {res.metadata['nota_avaliacao']}\nAvaliação: {res.page_content}\n\n"
+    i = 0
+    while True:
+        fetch_k = FETCH_K * (10**i)
+        fetch_k = min(fetch_k, INDEX_SIZE)
+        print(f"Query with increasing fetch_k: {i=} {fetch_k=}")
+        results = vector_store.similarity_search_with_score(
+            query,
+            k=fetch_k,
+            fetch_k=fetch_k,
+            filter=filter,
         )
-        print(res.metadata, "\n", print_)
-        context += print_
+        print(f"{len(results)=}/{fetch_k=} {n_responses=}")
+        if len(results) >= n_responses:
+            print("Results sufficient.")
+            break
+        elif fetch_k >= INDEX_SIZE or i >= 3:
+            print("Max queries reached!")
+            break
+        i += 1
+
+    # Construindo contexto
+    results = sorted(results, key=lambda x: x[1])[:n_responses]
+    context = ""
+    for i, (doc, score) in enumerate(results):
+        context_i = format_context(i, doc, score)
+        # print(res.metadata, "\n", context_i)
+        print(context_i)
+        context += context_i
     return results, context
 
 
@@ -221,14 +262,14 @@ def query_with_user_input(vector_store: FAISS, llm: HuggingFacePipeline):
             question=query,
         )
         # response = asyncio.run(query_model_async(llm, prompt))
-        response = query_model(llm, prompt)
+        response = query_model(llm, prompt)[0]
         # print(response)
         print("\n", "=" * 100, "\n")
 
 
 def query_make_filter(llm: HuggingFacePipeline, query: str):
     prompt_query = PROMPT_QUERY + f"PERGUNTA: {query}\nRESPOSTA: "
-    filter_raw = query_model(llm, prompt_query)
+    filter_raw = query_model(llm, prompt_query)[0]
     filter = {}
     query_updated = None
     try:
@@ -251,7 +292,7 @@ def rag_loop(vector_store: FAISS, llm: HuggingFacePipeline, query: str):
         context=context,
         question=query,
     )
-    response = query_model(llm, prompt)
+    response = query_model(llm, prompt)[0]
     return response
 
 
@@ -273,9 +314,13 @@ if __name__ == "__main__":
         embeddings, _ = load_embedding(EMBEDDING_MODEL, task_type="retrieval_document")
         df_sample = load_data(N_SAMPLES)
         create_index(df_sample, embeddings)
+    elif NORMALIZE_INDEX:
+        embeddings, _ = load_embedding(EMBEDDING_MODEL, task_type="retrieval_document")
+        normalize_index(embeddings)
     else:
-        embeddings, _ = load_embedding(EMBEDDING_MODEL, task_type="retrieval_query")
-        vector_store = load_index(embeddings)
+        # embeddings, _ = load_embedding(EMBEDDING_MODEL, task_type="retrieval_query")
+        # vector_store = load_index(embeddings)
+        vector_store, _, _ = load_rag(RAG_ALIAS)
 
         llm, _, _ = load_model("gemini-2.0-flash")
 
