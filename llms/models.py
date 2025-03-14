@@ -14,8 +14,13 @@ from analysis.src.utils import timeit
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-MAX_NEW_TOKENS = 3000
+MAX_NEW_TOKENS = 8192
 RESOURCE_EXAUSTED_BACKOFF_SECONDS = 60
+GOOGLE_API_KEYS = [
+    os.environ["GEMINI_API_KEY1"],
+    os.environ["GEMINI_API_KEY2"],
+    os.environ["GEMINI_API_KEY3"],
+]
 
 
 # fmt: off
@@ -32,6 +37,7 @@ models_text = {
     "gemini-1.5-pro":        ("google", "gemini-1.5-pro"),
     "gemini-2.0-pro":        ("google", "gemini-2.0-pro-exp"),
     "gemini-2.0-flash-thinking": ("google", "gemini-2.0-flash-thinking-exp"),
+    "gemma3":                ("google", "gemma-3-27b-it"),
 
     # "gemini-2.0-pro": ("open_router", "google/gemini-2.0-pro-exp-02-05:free", "https://openrouter.ai/api/v1"),
     # "gemini-2.0-flash-thinking": ("open_router", "google/gemini-2.0-flash-thinking-exp:free", "https://openrouter.ai/api/v1"),
@@ -54,7 +60,6 @@ models_embedding = {
     "gemini":      ("google", "models/gemini-embedding-exp-03-07"),
 }
 # fmt: on
-MAX_NEW_TOKENS = 3000
 
 
 class GenericHuggingFacePipeline:
@@ -155,6 +160,8 @@ def load_embedding(model_alias="google-4", task_type="retrieval_query"):
 
 @timeit
 def query_model(llm: HuggingFacePipeline, prompt: str):
+    if isinstance(llm.model, ChatGoogleGenerativeAI):
+        return query_model_google(llm, prompt)
     print("query_model...")
     print(f"{len(prompt)=}")
     # print(f"{len(prompt)=} {prompt=}")
@@ -164,13 +171,54 @@ def query_model(llm: HuggingFacePipeline, prompt: str):
     else:
         num_input_tokens = len(llm.pipeline.tokenizer.encode(prompt))
     print(f"{num_input_tokens=}")
+    llmresult = None
+    for i in range(10, 61, 10):
+        try:
+            llmresult = llm.generate([prompt])
+            break
+        except Exception as e:
+            print(f"Retrying in {i} seconds: {e}")
+            time.sleep(i)
+            print("Trying again...")
+    if llmresult is None:
+        llmresult = llm.generate([prompt])
+    response = llmresult.generations[0][0].text
     try:
-        llmresult = llm.generate([prompt])
-    except ResourceExhausted as e:
-        print(f"Waiting {RESOURCE_EXAUSTED_BACKOFF_SECONDS} seconds...")
-        time.sleep(RESOURCE_EXAUSTED_BACKOFF_SECONDS)
-        print("Trying again")
-        llmresult = llm.generate([prompt])
+        info = llmresult.generations[0][0].generation_info
+    except Exception as e:
+        print(f"Failed to get generation_info: {e}")
+        info = {}
+    print(f"{len(response)=}")
+    print(f"{response=}")
+    print(f"{info=}")
+    return response, info
+
+
+@timeit
+def query_model_google(llm: HuggingFacePipeline, prompt: str):
+    print("query_model_google...")
+    llmresult = None
+    key = llm.model.google_api_key.get_secret_value()
+    len_keys = len(GOOGLE_API_KEYS)
+    key_index = GOOGLE_API_KEYS.index(key)
+
+    print(f"{len(prompt)=} {key_index=}")
+    for s in range(10, 61, 10):
+        for i in range(len_keys):
+            try:
+                llmresult = llm.generate([prompt])
+                break
+            except ResourceExhausted as e:
+                key_index = GOOGLE_API_KEYS.index(key)
+                print(f"ResourceExhausted! With key {key_index}. Switching")
+                key_index = (key_index + 1) % len_keys
+                key = GOOGLE_API_KEYS[key_index]
+                llm.model.google_api_key._secret_value = key
+        if llmresult is not None:
+            break
+        print(f"ResourceExhausted! With all keys. Waiting {s} seconds...")
+        time.sleep(s)
+        print("Trying again...")
 
     response = llmresult.generations[0][0].text
     info = llmresult.generations[0][0].generation_info
