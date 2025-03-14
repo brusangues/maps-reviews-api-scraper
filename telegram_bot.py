@@ -38,6 +38,16 @@ MESSAGE_LIMIT = 4095
 
 
 # Commands
+def initial_start():
+    global LLM, INDEX, FILTER
+    print("Initial start")
+    FILTER = {}
+    LLM, model_name, max_new_tokens = load_model("gemini-2.0-flash-lite")
+    print(f"Modelo carregado: {model_name}\nCom máximo de tokens: {max_new_tokens}")
+    INDEX, rag_alias, embeddings_name = load_rag("google-ip")
+    print(f"Índice carregado: {rag_alias}\nModelo de embedding: {embeddings_name}")
+
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print("\nstart_command")
     global LLM, INDEX, FILTER
@@ -214,6 +224,8 @@ if __name__ == "__main__":
 
     # Errors
     app.add_error_handler(error)
+
+    initial_start()
 
     print("Polling...")
     app.run_polling(poll_interval=3)
