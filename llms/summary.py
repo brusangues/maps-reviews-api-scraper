@@ -19,9 +19,16 @@ TOPICS = [
     "Experiência e Entretenimento – Lazer, eventos, recreação, passeios, parcerias.",
     "Custo-benefício e Políticas – Preço justo, flexibilidade, transparência, fidelidade.",
 ]
+MAX_CONTEXT_LEN = None  # 50_000
+# og settings
 N_RESPONSES_TOPIC = 100
 N_RESPONSES_FULL = 1_000
 N_DOCS_MAX = 1_000
+
+# newer settings
+# N_RESPONSES_TOPIC = 1_000
+# N_RESPONSES_FULL = 2_000
+# N_DOCS_MAX = 2_000
 
 
 def prep_data(df: pd.DataFrame) -> pd.DataFrame:
@@ -72,6 +79,8 @@ def make_context_summary(docs) -> str:
         context_i = format_context(i, doc, score, include_hotel_context=False)
         context += context_i
 
+    if MAX_CONTEXT_LEN is not None:
+        context = context[:MAX_CONTEXT_LEN]
     return context
 
 

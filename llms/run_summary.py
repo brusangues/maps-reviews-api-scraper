@@ -10,14 +10,30 @@ from llms.summary import (
     make_prompt_summary_full_v2,
     make_prompts_summary_topic,
     make_prompt_final,
-    N_RESPONSES_TOPIC,
-    N_RESPONSES_FULL,
 )
 from llms.models import load_model, query_model
-from llms.g_eval import g_eval_scores
+from llms.g_eval_v2 import g_eval_scores
 from llms.rag import load_data, load_rag
 
-SUMMARIES_FOLDER = "data/hotel_summaries"
+RAG_ALIAS = "google-ip"
+LLM = "gemini-1.5-flash"
+LLM_EVAL = "gemini-2.0-flash"
+
+N_RESPONSES_FULL = 1_000
+N_RESPONSES_TOPIC = int(N_RESPONSES_FULL / 10)
+N_DOCS_MAX = N_RESPONSES_FULL
+
+# og settings
+# N_RESPONSES_TOPIC = 100
+# N_RESPONSES_FULL = 1000
+# N_DOCS_MAX = 1000
+# newer settings
+# N_RESPONSES_TOPIC = 1_000
+# N_RESPONSES_FULL = 2_000
+# N_DOCS_MAX = 2_000
+
+SUMMARIES_NAME = f"summaries_v2_{RAG_ALIAS}_{LLM}_{N_RESPONSES_FULL}"
+SUMMARIES_FOLDER = f"data/{SUMMARIES_NAME}"
 
 
 def run_make_summaries(
@@ -39,7 +55,11 @@ def run_make_summaries(
         print("\n", "=" * 100)
         print(f"{i=} {hotel_name=} {count_=} {n_responses_full=} {n_responses_topic=}")
 
-        prompt, context = make_prompt_summary_full(hotel_name, df)
+        prompt, context = make_prompt_summary_full(
+            hotel_name=hotel_name,
+            df=df,
+            n_docs=N_DOCS_MAX,
+        )
         response, info = query_model(llm, prompt)
 
         prompt_v2, context_v2 = make_prompt_summary_full_v2(
@@ -68,8 +88,12 @@ def run_make_summaries(
         response_final, info_final = query_model(llm, prompt_final)
         results_summaries.append(
             {
+                "summaries_name": SUMMARIES_NAME,
                 "model_name": model_name,
                 "max_new_tokens": max_new_tokens,
+                "n_responses_topic": N_RESPONSES_TOPIC,
+                "n_responses_full": N_RESPONSES_FULL,
+                "n_docs_max": N_DOCS_MAX,
                 "rag_alias": rag_alias,
                 "prompt": prompt,
                 "response": response,
@@ -105,13 +129,13 @@ def run_eval_summaries(
         print("\n", "=" * 100)
         print(f"{i=} {hotel_name=}")
         scores, scores_mean = g_eval_scores(
-            [hotel.response], hotel.context, llm, 2  # noqa
+            [hotel.response], hotel.context, llm, sleep=0  # noqa
         )
         scores_v2, scores_mean_v2 = g_eval_scores(
-            [hotel.response_v2], hotel.context_v2, llm, 2
+            [hotel.response_v2], hotel.context_v2, llm, sleep=0
         )
         scores_final, scores_mean_final = g_eval_scores(
-            [hotel.response_final], hotel.context_final, llm, 2
+            [hotel.response_final], hotel.context_final, llm, sleep=0
         )
 
         results_scores.append(
@@ -150,6 +174,9 @@ def run_make_summary_eval_hotel(
     llm,
     model_name: str,
     max_new_tokens: int,
+    llm_eval,
+    model_name_eval: str,
+    max_new_tokens_eval: int,
 ):
     # Sumários
     results_summaries = run_make_summaries(
@@ -166,19 +193,18 @@ def run_make_summary_eval_hotel(
     print(hotel_counts.iloc[0])
 
     # Avaliações
-    time.sleep(10)
-    try:
-        results_scores = run_eval_summaries(
-            hotel_counts=hotel_counts,
-            llm=llm,
-            model_name=model_name,
-            max_new_tokens=max_new_tokens,
-        )
-        df_scores = pd.DataFrame(results_scores)
-        hotel_counts[list(results_scores[0])] = df_scores
-        print(hotel_counts.iloc[0])
-    except Exception as e:
-        print(e)
+    # try:
+    results_scores = run_eval_summaries(
+        hotel_counts=hotel_counts,
+        llm=llm_eval,
+        model_name=model_name_eval,
+        max_new_tokens=max_new_tokens_eval,
+    )
+    df_scores = pd.DataFrame(results_scores)
+    hotel_counts[list(results_scores[0])] = df_scores
+    print(hotel_counts.iloc[0])
+    # except Exception as e:
+    #     print(e)
 
     # Salvando resultado
     hotel = hotel_counts.iloc[0].nome
@@ -190,9 +216,10 @@ def run_make_summary_eval_hotel(
 def main():
     # Carregando dados, modelos e rag
     df = load_data()
-    hotel_counts = prep_data(df)
-    vector_store, rag_alias, embeddings_name = load_rag("google-ip")
-    llm, model_name, max_new_tokens = load_model("gemini-2.0-flash")
+    hotel_counts = prep_data(df).iloc[:100]
+    vector_store, rag_alias, embeddings_name = load_rag(RAG_ALIAS)
+    llm, model_name, max_new_tokens = load_model(LLM)
+    llm_eval, model_name_eval, max_new_tokens_eval = load_model(LLM_EVAL)
 
     # Garantindo que pasta existe
     summaries_folder = Path(SUMMARIES_FOLDER)
@@ -210,6 +237,9 @@ def main():
             llm=llm,
             model_name=model_name,
             max_new_tokens=max_new_tokens,
+            llm_eval=llm_eval,
+            model_name_eval=model_name_eval,
+            max_new_tokens_eval=max_new_tokens_eval,
         )
 
 
