@@ -20,6 +20,7 @@ GOOGLE_API_KEYS = [
     os.environ["GEMINI_API_KEY1"],
     os.environ["GEMINI_API_KEY2"],
     os.environ["GEMINI_API_KEY3"],
+    os.environ["GEMINI_API_KEY4"],
 ]
 
 
@@ -63,9 +64,20 @@ models_embedding = {
 
 
 class GenericHuggingFacePipeline:
-    def __init__(self, model):
-        self.model = model
+    def __init__(self, models):
+        self.model_i = 0
+        self.model = models[0]
+        self.models = models
         self.pipeline = None
+
+    def switch_models(self):
+        key = self.model.google_api_key.get_secret_value()
+        print(f"Current model: {self.model_i} {self.model.model} {key[-4:]}")
+        len_models = len(self.models)
+        self.model_i = (self.model_i + 1) % len_models
+        self.model = self.models[self.model_i]
+        key = self.model.google_api_key.get_secret_value()
+        print(f"Next model:    {self.model_i} {self.model.model} {key[-4:]}")
 
     def generate(self, prompts, **kwargs):
         results = []
@@ -105,18 +117,22 @@ def load_model(model_alias="gemini-2.0-flash", max_new_tokens=MAX_NEW_TOKENS):
             max_completion_tokens=max_new_tokens,
         )
         print(f"{llm=}")
-        hf_pipe = GenericHuggingFacePipeline(model=llm)
+        hf_pipe = GenericHuggingFacePipeline(models=[llm])
     elif provider == "google":
         print("Loading ChatGoogleGenerativeAI model...")
-        llm = ChatGoogleGenerativeAI(
-            model=model_name,
-            temperature=0,
-            max_output_tokens=max_new_tokens,
-            timeout=10,
-            max_retries=5,
-        )
-        print(f"{llm=}")
-        hf_pipe = GenericHuggingFacePipeline(model=llm)
+        models = []
+        for key in GOOGLE_API_KEYS:
+            llm = ChatGoogleGenerativeAI(
+                model=model_name,
+                temperature=0,
+                max_output_tokens=max_new_tokens,
+                timeout=60,
+                max_retries=3,
+                google_api_key=key,
+            )
+            print(f"{llm=}")
+            models.append(llm)
+        hf_pipe = GenericHuggingFacePipeline(models=models)
     else:
         print("Loading transformers.pipeline local model...")
         pipe = transformers.pipeline(
@@ -201,19 +217,19 @@ def query_model_google(llm: HuggingFacePipeline, prompt: str):
     key = llm.model.google_api_key.get_secret_value()
     len_keys = len(GOOGLE_API_KEYS)
     key_index = GOOGLE_API_KEYS.index(key)
+    model_name = llm.model.model
 
-    print(f"{len(prompt)=} {key_index=}")
+    print(f"{len(prompt)=} {model_name=} {key_index=} {key[-4:]=}")
     for s in range(10, 61, 10):
         for i in range(len_keys):
             try:
                 llmresult = llm.generate([prompt])
                 break
             except ResourceExhausted as e:
+                key = llm.model.google_api_key.get_secret_value()
                 key_index = GOOGLE_API_KEYS.index(key)
-                print(f"ResourceExhausted! With key {key_index}. Switching")
-                key_index = (key_index + 1) % len_keys
-                key = GOOGLE_API_KEYS[key_index]
-                llm.model.google_api_key._secret_value = key
+                print(f"ResourceExhausted! With key {key_index=} {key[-4:]=}")
+                llm.switch_models()
         if llmresult is not None:
             break
         print(f"ResourceExhausted! With all keys. Waiting {s} seconds...")
