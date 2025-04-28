@@ -332,6 +332,60 @@
         "top_k": 40
     },
     {
+        "name": "models/gemini-2.5-pro-exp-03-25",
+        "base_model_id": "",
+        "version": "2.5-exp-03-25",
+        "display_name": "Gemini 2.5 Pro Experimental 03-25",
+        "description": "Experimental release (March 25th, 2025) of Gemini 2.5 Pro",
+        "input_token_limit": 1048576,
+        "output_token_limit": 65536,
+        "supported_generation_methods": [
+            "generateContent",
+            "countTokens",
+            "createCachedContent"
+        ],
+        "temperature": 1.0,
+        "max_temperature": 2.0,
+        "top_p": 0.95,
+        "top_k": 64
+    },
+    {
+        "name": "models/gemini-2.5-pro-preview-03-25",
+        "base_model_id": "",
+        "version": "2.5-preview-03-25",
+        "display_name": "Gemini 2.5 Pro Preview 03-25",
+        "description": "Gemini 2.5 Pro Preview 03-25",
+        "input_token_limit": 1048576,
+        "output_token_limit": 65536,
+        "supported_generation_methods": [
+            "generateContent",
+            "countTokens",
+            "createCachedContent"
+        ],
+        "temperature": 1.0,
+        "max_temperature": 2.0,
+        "top_p": 0.95,
+        "top_k": 64
+    },
+    {
+        "name": "models/gemini-2.5-flash-preview-04-17",
+        "base_model_id": "",
+        "version": "2.5-preview-04-17",
+        "display_name": "Gemini 2.5 Flash Preview 04-17",
+        "description": "Preview release (April 17th, 2025) of Gemini 2.5 Flash",
+        "input_token_limit": 1048576,
+        "output_token_limit": 65536,
+        "supported_generation_methods": [
+            "generateContent",
+            "countTokens",
+            "createCachedContent"
+        ],
+        "temperature": 1.0,
+        "max_temperature": 2.0,
+        "top_p": 0.95,
+        "top_k": 64
+    },
+    {
         "name": "models/gemini-2.0-flash-exp",
         "base_model_id": "",
         "version": "2.0",
@@ -359,7 +413,8 @@
         "output_token_limit": 8192,
         "supported_generation_methods": [
             "generateContent",
-            "countTokens"
+            "countTokens",
+            "createCachedContent"
         ],
         "temperature": 1.0,
         "max_temperature": 2.0,
@@ -376,7 +431,8 @@
         "output_token_limit": 8192,
         "supported_generation_methods": [
             "generateContent",
-            "countTokens"
+            "countTokens",
+            "createCachedContent"
         ],
         "temperature": 1.0,
         "max_temperature": 2.0,
@@ -411,7 +467,8 @@
         "output_token_limit": 8192,
         "supported_generation_methods": [
             "generateContent",
-            "countTokens"
+            "countTokens",
+            "createCachedContent"
         ],
         "temperature": 1.0,
         "max_temperature": 2.0,
@@ -428,7 +485,8 @@
         "output_token_limit": 8192,
         "supported_generation_methods": [
             "generateContent",
-            "countTokens"
+            "countTokens",
+            "createCachedContent"
         ],
         "temperature": 1.0,
         "max_temperature": 2.0,
@@ -445,7 +503,8 @@
         "output_token_limit": 8192,
         "supported_generation_methods": [
             "generateContent",
-            "countTokens"
+            "countTokens",
+            "createCachedContent"
         ],
         "temperature": 1.0,
         "max_temperature": 2.0,
@@ -462,7 +521,8 @@
         "output_token_limit": 8192,
         "supported_generation_methods": [
             "generateContent",
-            "countTokens"
+            "countTokens",
+            "createCachedContent"
         ],
         "temperature": 1.0,
         "max_temperature": 2.0,
@@ -472,14 +532,15 @@
     {
         "name": "models/gemini-2.0-pro-exp",
         "base_model_id": "",
-        "version": "2.0",
+        "version": "2.5-exp-03-25",
         "display_name": "Gemini 2.0 Pro Experimental",
-        "description": "Experimental release (February 5th, 2025) of Gemini 2.0 Pro",
-        "input_token_limit": 2097152,
-        "output_token_limit": 8192,
+        "description": "Experimental release (March 25th, 2025) of Gemini 2.5 Pro",
+        "input_token_limit": 1048576,
+        "output_token_limit": 65536,
         "supported_generation_methods": [
             "generateContent",
-            "countTokens"
+            "countTokens",
+            "createCachedContent"
         ],
         "temperature": 1.0,
         "max_temperature": 2.0,
@@ -489,14 +550,15 @@
     {
         "name": "models/gemini-2.0-pro-exp-02-05",
         "base_model_id": "",
-        "version": "2.0",
+        "version": "2.5-exp-03-25",
         "display_name": "Gemini 2.0 Pro Experimental 02-05",
-        "description": "Experimental release (February 5th, 2025) of Gemini 2.0 Pro",
-        "input_token_limit": 2097152,
-        "output_token_limit": 8192,
+        "description": "Experimental release (March 25th, 2025) of Gemini 2.5 Pro",
+        "input_token_limit": 1048576,
+        "output_token_limit": 65536,
         "supported_generation_methods": [
             "generateContent",
-            "countTokens"
+            "countTokens",
+            "createCachedContent"
         ],
         "temperature": 1.0,
         "max_temperature": 2.0,
@@ -506,14 +568,15 @@
     {
         "name": "models/gemini-exp-1206",
         "base_model_id": "",
-        "version": "2.0",
+        "version": "2.5-exp-03-25",
         "display_name": "Gemini Experimental 1206",
-        "description": "Experimental release (February 5th, 2025) of Gemini 2.0 Pro",
-        "input_token_limit": 2097152,
-        "output_token_limit": 8192,
+        "description": "Experimental release (March 25th, 2025) of Gemini 2.5 Pro",
+        "input_token_limit": 1048576,
+        "output_token_limit": 65536,
         "supported_generation_methods": [
             "generateContent",
-            "countTokens"
+            "countTokens",
+            "createCachedContent"
         ],
         "temperature": 1.0,
         "max_temperature": 2.0,
@@ -523,16 +586,17 @@
     {
         "name": "models/gemini-2.0-flash-thinking-exp-01-21",
         "base_model_id": "",
-        "version": "2.0-exp-01-21",
-        "display_name": "Gemini 2.0 Flash Thinking Experimental 01-21",
-        "description": "Experimental release (January 21st, 2025) of Gemini 2.0 Flash Thinking",
+        "version": "2.5-preview-04-17",
+        "display_name": "Gemini 2.5 Flash Preview 04-17",
+        "description": "Preview release (April 17th, 2025) of Gemini 2.5 Flash",
         "input_token_limit": 1048576,
         "output_token_limit": 65536,
         "supported_generation_methods": [
             "generateContent",
-            "countTokens"
+            "countTokens",
+            "createCachedContent"
         ],
-        "temperature": 0.7,
+        "temperature": 1.0,
         "max_temperature": 2.0,
         "top_p": 0.95,
         "top_k": 64
@@ -540,16 +604,17 @@
     {
         "name": "models/gemini-2.0-flash-thinking-exp",
         "base_model_id": "",
-        "version": "2.0-exp-01-21",
-        "display_name": "Gemini 2.0 Flash Thinking Experimental 01-21",
-        "description": "Experimental release (January 21st, 2025) of Gemini 2.0 Flash Thinking",
+        "version": "2.5-preview-04-17",
+        "display_name": "Gemini 2.5 Flash Preview 04-17",
+        "description": "Preview release (April 17th, 2025) of Gemini 2.5 Flash",
         "input_token_limit": 1048576,
         "output_token_limit": 65536,
         "supported_generation_methods": [
             "generateContent",
-            "countTokens"
+            "countTokens",
+            "createCachedContent"
         ],
-        "temperature": 0.7,
+        "temperature": 1.0,
         "max_temperature": 2.0,
         "top_p": 0.95,
         "top_k": 64
@@ -557,16 +622,17 @@
     {
         "name": "models/gemini-2.0-flash-thinking-exp-1219",
         "base_model_id": "",
-        "version": "2.0",
-        "display_name": "Gemini 2.0 Flash Thinking Experimental",
-        "description": "Gemini 2.0 Flash Thinking Experimental",
+        "version": "2.5-preview-04-17",
+        "display_name": "Gemini 2.5 Flash Preview 04-17",
+        "description": "Preview release (April 17th, 2025) of Gemini 2.5 Flash",
         "input_token_limit": 1048576,
         "output_token_limit": 65536,
         "supported_generation_methods": [
             "generateContent",
-            "countTokens"
+            "countTokens",
+            "createCachedContent"
         ],
-        "temperature": 0.7,
+        "temperature": 1.0,
         "max_temperature": 2.0,
         "top_p": 0.95,
         "top_k": 64
@@ -585,6 +651,74 @@
         ],
         "temperature": 1.0,
         "max_temperature": 2.0,
+        "top_p": 0.95,
+        "top_k": 64
+    },
+    {
+        "name": "models/learnlm-2.0-flash-experimental",
+        "base_model_id": "",
+        "version": "2.0",
+        "display_name": "LearnLM 2.0 Flash Experimental",
+        "description": "LearnLM 2.0 Flash Experimental",
+        "input_token_limit": 1048576,
+        "output_token_limit": 32768,
+        "supported_generation_methods": [
+            "generateContent",
+            "countTokens"
+        ],
+        "temperature": 1.0,
+        "max_temperature": 2.0,
+        "top_p": 0.95,
+        "top_k": 64
+    },
+    {
+        "name": "models/gemma-3-1b-it",
+        "base_model_id": "",
+        "version": "001",
+        "display_name": "Gemma 3 1B",
+        "description": "",
+        "input_token_limit": 32768,
+        "output_token_limit": 8192,
+        "supported_generation_methods": [
+            "generateContent",
+            "countTokens"
+        ],
+        "temperature": 1.0,
+        "max_temperature": null,
+        "top_p": 0.95,
+        "top_k": 64
+    },
+    {
+        "name": "models/gemma-3-4b-it",
+        "base_model_id": "",
+        "version": "001",
+        "display_name": "Gemma 3 4B",
+        "description": "",
+        "input_token_limit": 32768,
+        "output_token_limit": 8192,
+        "supported_generation_methods": [
+            "generateContent",
+            "countTokens"
+        ],
+        "temperature": 1.0,
+        "max_temperature": null,
+        "top_p": 0.95,
+        "top_k": 64
+    },
+    {
+        "name": "models/gemma-3-12b-it",
+        "base_model_id": "",
+        "version": "001",
+        "display_name": "Gemma 3 12B",
+        "description": "",
+        "input_token_limit": 32768,
+        "output_token_limit": 8192,
+        "supported_generation_methods": [
+            "generateContent",
+            "countTokens"
+        ],
+        "temperature": 1.0,
+        "max_temperature": null,
         "top_p": 0.95,
         "top_k": 64
     },
@@ -646,7 +780,8 @@
         "input_token_limit": 8192,
         "output_token_limit": 1,
         "supported_generation_methods": [
-            "embedContent"
+            "embedContent",
+            "countTextTokens"
         ],
         "temperature": null,
         "max_temperature": null,
@@ -662,7 +797,8 @@
         "input_token_limit": 8192,
         "output_token_limit": 1,
         "supported_generation_methods": [
-            "embedContent"
+            "embedContent",
+            "countTextTokens"
         ],
         "temperature": null,
         "max_temperature": null,
@@ -700,5 +836,22 @@
         "max_temperature": null,
         "top_p": null,
         "top_k": null
+    },
+    {
+        "name": "models/gemini-2.0-flash-live-001",
+        "base_model_id": "",
+        "version": "001",
+        "display_name": "Gemini 2.0 Flash 001",
+        "description": "Gemini 2.0 Flash 001",
+        "input_token_limit": 131072,
+        "output_token_limit": 8192,
+        "supported_generation_methods": [
+            "bidiGenerateContent",
+            "countTokens"
+        ],
+        "temperature": 1.0,
+        "max_temperature": 2.0,
+        "top_p": 0.95,
+        "top_k": 64
     }
 ]
