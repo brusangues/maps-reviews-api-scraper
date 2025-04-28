@@ -39,6 +39,7 @@ models_text = {
     "gemini-2.0-pro":        ("google", "gemini-2.0-pro-exp"),
     "gemini-2.0-flash-thinking": ("google", "gemini-2.0-flash-thinking-exp"),
     "gemma3":                ("google", "gemma-3-27b-it"),
+    "gemini-2.5-flash": ("google", "models/gemini-2.5-flash-preview-04-17"),
 
     # "gemini-2.0-pro": ("open_router", "google/gemini-2.0-pro-exp-02-05:free", "https://openrouter.ai/api/v1"),
     # "gemini-2.0-flash-thinking": ("open_router", "google/gemini-2.0-flash-thinking-exp:free", "https://openrouter.ai/api/v1"),
