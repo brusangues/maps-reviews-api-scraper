@@ -2,8 +2,79 @@ import time
 import re
 import pandas as pd
 from tqdm import tqdm
+from pathlib import Path
+import os
 
-from llms.models import query_model
+from llms.models import load_model, query_model
+
+
+LOAD_PREP_SUMMARIES = False
+LIMIT = None
+JUDGE_MODEL = "gemini-2.5-flash"
+SUMMARIES = [
+    "summaries_v2_google-ip_gemini-1.5-flash-8b_1000",
+    "summaries_v2_google-ip_gemini-2.0-flash-lite_1000",
+    "summaries_v2_google-ip_gemini-2.0-flash_1000",
+    "summaries_v2_gte-ip_gemini-1.5-flash-8b_1000",
+    "summaries_v2_gte-ip_gemini-2.0-flash-lite_1000",
+    "summaries_v2_gte-ip_gemini-2.0-flash_1000",
+    "summaries_v2_google-ip_gemma3_101",
+]
+
+COMPARISONS = [
+    # Comparando tipos de resumo
+    {
+        "comparison": "v3_2flash_v2_vs_v1",
+        "summary_name_1": "summaries_v2_google-ip_gemini-2.0-flash_1000",
+        "summary_type_1": "response_v2",
+        "summary_name_2": "summaries_v2_google-ip_gemini-2.0-flash_1000",
+        "summary_type_2": "response",
+    },
+    {
+        "comparison": "v3_2flash_final_vs_v2",
+        "summary_name_1": "summaries_v2_google-ip_gemini-2.0-flash_1000",
+        "summary_type_1": "response_final",
+        "summary_name_2": "summaries_v2_google-ip_gemini-2.0-flash_1000",
+        "summary_type_2": "response_v2",
+    },
+    {
+        "comparison": "v3_2flash_final_vs_v1",
+        "summary_name_1": "summaries_v2_google-ip_gemini-2.0-flash_1000",
+        "summary_type_1": "response_final",
+        "summary_name_2": "summaries_v2_google-ip_gemini-2.0-flash_1000",
+        "summary_type_2": "response",
+    },
+    # # # Comparando índices
+    # {
+    #     "comparison": "v3_2flash_final_google_vs_gte",
+    #     "summary_name_1": "summaries_v2_google-ip_gemini-2.0-flash_1000",
+    #     "summary_type_1": "response_final",
+    #     "summary_name_2": "summaries_v2_gte-ip_gemini-2.0-flash_1000",
+    #     "summary_type_2": "response_final",
+    # },
+    # # Comparando modelos
+    {
+        "comparison": "v4_2flash_vs_15flash_final",
+        "summary_name_1": "summaries_v2_google-ip_gemini-2.0-flash_1000",
+        "summary_type_1": "response_final",
+        "summary_name_2": "summaries_v2_google-ip_gemini-1.5-flash-8b_1000",
+        "summary_type_2": "response_final",
+    },
+    # {
+    #     "comparison": "v3_2flash_vs_gemma_final",
+    #     "summary_name_1": "summaries_v2_google-ip_gemini-2.0-flash_1000",
+    #     "summary_type_1": "response_final",
+    #     "summary_name_2": "summaries_v2_google-ip_gemma3_101",
+    #     "summary_type_2": "response_final",
+    # },
+    # {
+    #     "comparison": "v4_2flash_vs_gemma_final",
+    #     "summary_name_1": "summaries_v2_google-ip_gemini-2.0-flash_1000",
+    #     "summary_type_1": "response_final",
+    #     "summary_name_2": "summaries_v2_google-ip_gemma3_101",
+    #     "summary_type_2": "response_final",
+    # },
+]
 
 EVALUATION_PROMPT_TEMPLATE = """
 
@@ -14,8 +85,7 @@ Primeiro, resolva a pergunta do usuário passo a passo de forma independente. Em
 
 Evite qualquer viés de posição e assegure-se de que a ordem de apresentação das respostas não influencie sua decisão. Não permita que o tamanho das respostas influencie sua avaliação. Não favoreça certos nomes de assistentes. Seja o mais objetivo possível.  
 
-Após fornecer uma breve explicação, apresente seu veredito final seguindo estritamente este formato: `"[[A]]"` se a resposta do Assistente A for melhor, `"[[B]]"` se a resposta do Assistente B for melhor, e `"[[C]]"` em caso de empate.
-Lembre-se de manter a explicação concisa e direto ao ponto.
+Após fornecer uma explicação, apresente seu veredito final seguindo estritamente este formato: `"[[A]]"` se a resposta do Assistente A for melhor, `"[[B]]"` se a resposta do Assistente B for melhor, e `"[[C]]"` em caso de empate.
 
 [Pergunta do Usuário]  
 {question}  
@@ -92,3 +162,93 @@ def pairwise_eval(s1, s2, s1_name="", s2_name="", nome="", question=QUESTION, ll
         "info": info,
     }
     return data
+
+
+def select_summaries(df, comparison):
+    dfi = (
+        df[["nome", "summaries_name", "response", "response_v2", "response_final"]]
+        .set_index("nome")
+        .copy()
+    )
+    s1 = dfi[dfi.summaries_name == comparison["summary_name_1"]][
+        comparison["summary_type_1"]
+    ]
+    s1.name = comparison["summary_name_1"] + "_" + comparison["summary_type_1"]
+    s2 = dfi[dfi.summaries_name == comparison["summary_name_2"]][
+        comparison["summary_type_2"]
+    ]
+    s2.name = comparison["summary_name_2"] + "_" + comparison["summary_type_2"]
+    return s1, s2
+
+
+def compare_summaries(
+    df, comparisons, llm, limit=None, folder="data/evals", invert=True
+):
+    print("compare_summaries...")
+    dfs = []
+    for comparison in tqdm(comparisons, total=len(comparisons), desc="comparisons"):
+        comparison_name = comparison["comparison"]
+        print(f"{comparison_name=}")
+        s1, s2 = select_summaries(df, comparison)
+        if limit:
+            s1 = s1.iloc[:limit]
+            s2 = s2.iloc[:limit]
+        evals = pairwise_eval_series(s1, s2, llm=llm)
+        if invert:
+            evals_ = pairwise_eval_series(s2, s1, llm=llm)
+        df_evals = pd.DataFrame(evals)
+        df_evals["pairwise_eval_"] = pd.DataFrame(evals_)["pairwise_eval"]
+        df_evals["comparison"] = comparison_name
+        out_path = f"{folder}/{comparison_name}.pq"
+        df_evals.to_parquet(out_path)
+        dfs.append(df_evals)
+    return dfs
+
+
+def load_summaries(summaries_folder):
+    summaries_folder = Path(summaries_folder)
+    files = os.listdir(summaries_folder)
+    print(summaries_folder, len(files))
+    hotels = []
+    for file in files:
+        dfi = pd.read_parquet(summaries_folder / file)
+        hotels.append(dfi)
+    df_results = pd.concat(hotels).reset_index(drop=True)
+    return df_results
+
+
+def load_prep_summaries(summaries=SUMMARIES):
+    # Load
+    dfs = []
+    for s in summaries:
+        df = load_summaries("data\\" + s)
+        df["summary_name"] = s.replace("data\\", "")
+        dfs.append(df)
+    # Prep
+    df_results = pd.concat(dfs)
+    print(f"{df_results.shape=}")
+    df_na = df_results[df_results.isna().any(axis=1)]
+    print(f"{df_na.shape=}")
+    df_results = df_results[~df_results.isna().any(axis=1)]
+    print(f"{df_results.shape=}")
+    n_sums = df_results.summary_name.nunique()
+    print(f"{n_sums=}")
+    hotel_counts = df_results.groupby("nome").count().iloc[:, 0]
+    print(f"{len(hotel_counts)=}")
+    hotels_common = hotel_counts[hotel_counts == n_sums].index
+    print(f"{len(hotels_common)=}")
+    df_results_common = df_results[df_results.nome.isin(hotels_common)].copy()
+    print(f"{df_results_common.shape=}")
+    return df_results_common
+
+
+if __name__ == "__main__":
+    if LOAD_PREP_SUMMARIES:
+        df_summaries = load_prep_summaries()
+        df_summaries.to_parquet("data/evals/df_summaries.pq")
+    else:
+        df_summaries = pd.read_parquet("data/evals/df_summaries.pq")
+
+    llm, model_name, max_new_tokens = load_model(JUDGE_MODEL)
+
+    dfs = compare_summaries(df_summaries, COMPARISONS, llm=llm, limit=LIMIT)
