@@ -48,6 +48,7 @@ rags = {
     "gte-ip": ["gte", "data/faiss_index_gte_v5_ip"],
     "google-l2": ["google-4", "data/faiss_index_google_v4"],
     "google-ip": ["google-4", "data/faiss_index_google_v4_ip"],
+    "gemini-ip": ["gemini", "data/faiss_index_gemini_v1_ip"],
 }
 
 
@@ -81,6 +82,8 @@ def create_index(
     embeddings: HuggingFaceEmbeddings,
     index_type: str = "ip",
     path_index: str = PATH_INDEX,
+    sleep: int = 0,
+    d: int = None,
 ):
     print("Creating index...")
 
@@ -96,14 +99,17 @@ def create_index(
         # print(metadata)
         doc = Document(page_content=text, metadata=metadata, id=str(uuid4()))
         docs.append(doc)
+    print(f"{len(docs)=}")
 
     # Embedding docs
     print("Embedding docs...")
     len_docs = len(docs)
     batch_size = INDEX_BATCH_SIZE
+    if d is None:
+        d = len(embeddings.embed_query("hi man"))  # 768 ou 3072
+    print(f"{d=}")
     for i in tqdm(range(0, len_docs, batch_size)):
         batch = docs[i : i + batch_size]
-        d = len(embeddings.embed_query("hi man"))
         if index_type == "ip":
             index = faiss.IndexFlatIP(d)
         else:
@@ -114,7 +120,12 @@ def create_index(
             docstore=InMemoryDocstore(),
             index_to_docstore_id={},
         )
-        vector_store.add_documents(documents=batch)
+        if sleep <= 0:
+            vector_store.add_documents(documents=batch)
+        else:
+            for doc in tqdm(batch, total=len(batch)):
+                vector_store.add_documents(documents=[doc])
+                time.sleep(sleep)
         vector_store.save_local(path_index + f"/{i}")
     print("Index creation finished!")
 
